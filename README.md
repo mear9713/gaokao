@@ -1,186 +1,58 @@
 <div align="center">
 
-# 🎓 高考志愿填报 AI Agent
+# 高考志愿填报 AI Agent
 
-### 为高考一本线上考生设计的 **AI Agent 驱动 + RAG 知识库** 智能志愿规划系统
+为高考一本线上考生设计的志愿规划工具，综合录取数据、保研政策、培养方案，
+用 Agent + RAG 给出冲稳保推荐和保研路径评估。
 
-<br/>
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TS-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![shadcn](https://img.shields.io/badge/shadcn%2Fui-new--york-000000)](https://ui.shadcn.com/)
 
-**让"我能考上哪？"变成"我应该选哪？"**
-
-<br/>
-
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind](https://img.shields.io/badge/TailwindCSS-v4-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-new--york-000?style=for-the-badge)](https://ui.shadcn.com/)
-[![Recharts](https://img.shields.io/badge/Recharts-3.0-FF6384?style=for-the-badge)](https://recharts.org/)
-
-<br/>
-
-**📋 [完整接口规范](./docs/接口规范.md)** · **📊 [数据采集要求](./docs/数据收集要求.md)**
+[接口规范](./docs/接口规范.md) · [数据采集要求](./docs/数据收集要求.md)
 
 </div>
 
 ---
 
-## 🎯 一图看懂产品
+## 它能干什么
+
+学生填完高考信息（分数、位次、选科、偏好）之后：
 
 ```mermaid
 flowchart LR
-  A[🎓 学生输入<br/>分数 + 位次 + 偏好] --> B{🧠 AI Agent}
-  B --> C[📥 解析画像]
-  B --> D[🔍 RAG 检索<br/>8 类 200+ 文档]
-  B --> E[🎯 匹配算法]
-  C & D & E --> F[💡 输出]
-  F --> G[📊 冲稳保推荐<br/>3 + 4 + 3]
-  F --> H[🎯 保研 5 维评估]
-  F --> I[🛣️ 升学规划报告]
-
-  style A fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#000
-  style B fill:#a855f7,stroke:#7c3aed,stroke-width:3px,color:#fff
-  style F fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
-  style G fill:#fef3c7,stroke:#f59e0b,color:#000
-  style H fill:#ede9fe,stroke:#7c3aed,color:#000
-  style I fill:#dbeafe,stroke:#3b82f6,color:#000
+  A[学生信息] --> B((AI Agent))
+  B --> C[RAG 检索<br/>招生/保研/培养方案]
+  C --> B
+  B --> D[冲稳保推荐]
+  B --> E[5 维保研评估]
+  B --> F[志愿规划报告]
+  style B fill:#a855f7,stroke:#7c3aed,color:#fff
 ```
 
-> 不只是"分数能上哪所学校"——而是 **5 维度评估你 4 年后的保研竞争力 + AI Agent 像顾问一样陪你聊**。
+跟一般志愿填报工具不同的地方在于：
+
+- **AI Agent 显式推理**：5 步执行链全程可视化，不是黑盒
+- **保研 5 维评估**：把"我能上哪"延伸到"上了之后保研竞争力如何"
+- **RAG 引用可溯**：每个建议下方挂着原文摘录和文件来源
 
 ---
 
-## ✨ 8 大产品亮点
+## 保研 5 维评估
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### 🤖 真正的 AI Agent 体验
-
-**5 步可视化执行链**：分析画像 → 检索招生 → 查保研政策 → 匹配院校 → 生成建议，每步都看得见 AI 在干啥。
-
-- ⚡ **快速模式**：5 步 / 3 source
-- 🔬 **深度模式**：7 步 / 5 source / 扩展分析段
-- 🧠 **上下文缓存**：第 2+ 轮提问，已分析画像自动 cached，节省 token
-- 📡 **SSE 流式输出**：逐字打字机，节奏从容
-
-</td>
-<td width="50%" valign="top">
-
-### 🎯 保研 5 维评估（行业首创）
-
-**不再是"较高 / 较好"模糊评价**，每个维度都有：
-
-- 📊 **0-10 分制评分**
-- 📝 一句话评估理由
-- 📈 **4 条原始数据**（如"学院保研率 28%"）
-- 📚 **明确文件来源**（如"2024 推免实施细则"）
-
-5 维：推免机会 / 竞争友好度 / 成绩可控性 / 科研加分空间 / 升学去向质量
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### 📚 RAG 知识库引用
-
-**8 类知识源**全程可溯：
-
-`招生数据` · `录取数据` · `保研政策` · `专业信息`<br/>
-`培养方案` · `奖学金政策` · `转专业政策` · `院校官网`
-
-每条 AI 回答下方展示**命中的原文摘录** + 关联说明，告别"AI 瞎编"。
-
-</td>
-<td width="50%" valign="top">
-
-### 🧠 AI 记忆浮窗
-
-Agent 自动累积对话上下文：
-
-- 📌 **对话中你强调过的**（按提及次数排序）
-- 🏫 **你提及过的院校**（含频次）
-- 🔍 **最近关注的话题**
-- 📊 会话轮数 / 时长
-
-让 AI 真的"懂你"，不是每轮都从零开始。
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### 🔐 完整登录权限系统
-
-| 角色 | 默认账号 | 可访问 |
-|------|----------|--------|
-| 👑 管理员 | `admin / admin123` | 全部 + 知识库后台 |
-| 🎓 学生 | `student / 123456` | 全部用户功能 |
-| 🚫 游客 | – | 仅登录页 |
-
-路由级 `RequireAuth` 守卫 + JWT + localStorage 持久化。
-
-</td>
-<td width="50%" valign="top">
-
-### 🛠️ 管理员知识库后台
-
-完整 B 端运营能力：
-
-- 📊 **统计看板**：总文档 247 / 18,642 向量切片
-- 🎨 **8 类分布**：每类独立色彩 + 数量
-- 📝 **文档 CRUD**：增 / 改 / 删 / 搜索
-- ⬆️ **上传弹窗**：8 类选择 + 自动切片入向量库
-
-不只是 C 端产品，还有完整的运营后台。
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### 🎨 苹果风视觉系统
-
-- **Hero + Sticky Tab + Scroll Spy**（详情页）
-- **Hero 大数字 + 计数动画**（保研区）
-- **渐变玻璃态卡片**（教育科技配色）
-- **顶部路由进度条**（每次切换页面）
-- **页面 fade-up + blur 过渡**（500ms 缓动）
-- **Toast 通知系统**（4 档反馈）
-
-</td>
-<td width="50%" valign="top">
-
-### ⚡ 工程级架构
-
-- **接口适配层**：`src/services/agentApi.ts` 含 Mock + 真实 SSE 切换示例
-- **TypeScript 全量类型**：`src/types/index.ts` 单一真相源
-- **后端就绪后只改 1 个文件**：UI 一行不动即可对接
-- **完整接口契约**：[`docs/接口规范.md`](./docs/接口规范.md) 9 个 API 规范
-
-</td>
-</tr>
-</table>
-
----
-
-## 🎯 保研 5 维评估（核心差异化）
-
-> 雷达图直接画在 README 里 ↓
+详情页的核心模块。每所院校的目标专业都按以下 5 个维度打分（0-10）：
 
 <div align="center">
 
-<svg width="500" height="500" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+<svg width="480" height="480" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="grad" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.7"/>
       <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.3"/>
     </radialGradient>
   </defs>
-
-  <!-- 同心五边形网格 -->
   <g stroke="#cbd5e1" stroke-width="1" fill="none" opacity="0.5">
     <polygon points="250,80 412,197 350,388 150,388 88,197"/>
     <polygon points="250,114 380,208 330,361 170,361 120,208"/>
@@ -188,8 +60,6 @@ Agent 自动累积对话上下文：
     <polygon points="250,182 316,230 290,307 210,307 184,230"/>
     <polygon points="250,216 284,241 270,280 230,280 216,241"/>
   </g>
-
-  <!-- 5 条放射轴 -->
   <g stroke="#cbd5e1" stroke-width="1" opacity="0.5">
     <line x1="250" y1="250" x2="250" y2="80"/>
     <line x1="250" y1="250" x2="412" y2="197"/>
@@ -197,318 +67,190 @@ Agent 自动累积对话上下文：
     <line x1="250" y1="250" x2="150" y2="388"/>
     <line x1="250" y1="250" x2="88" y2="197"/>
   </g>
-
-  <!-- 数据面：8.5 / 6.0 / 7.5 / 8.5 / 9.0 -->
-  <!-- 顶点（按 score/10 比例）：
-       推免机会 8.5: (250, 105)
-       竞争友好 6.0: (347, 218)  
-       成绩可控 7.5: (325, 354)
-       科研加分 8.5: (165, 372)
-       去向质量 9.0: (97, 207)  -->
   <polygon points="250,105 347,218 325,354 165,372 97,207"
            fill="url(#grad)" stroke="#7c3aed" stroke-width="2.5"/>
-
-  <!-- 顶点标记 -->
   <circle cx="250" cy="105" r="5" fill="#7c3aed"/>
   <circle cx="347" cy="218" r="5" fill="#7c3aed"/>
   <circle cx="325" cy="354" r="5" fill="#7c3aed"/>
   <circle cx="165" cy="372" r="5" fill="#7c3aed"/>
   <circle cx="97" cy="207" r="5" fill="#7c3aed"/>
-
-  <!-- 分数标签 -->
   <text x="250" y="68" text-anchor="middle" font-size="20" font-weight="bold" fill="#7c3aed">8.5</text>
   <text x="370" y="216" text-anchor="start" font-size="20" font-weight="bold" fill="#7c3aed">6.0</text>
   <text x="345" y="380" text-anchor="start" font-size="20" font-weight="bold" fill="#7c3aed">7.5</text>
   <text x="155" y="395" text-anchor="end" font-size="20" font-weight="bold" fill="#7c3aed">8.5</text>
   <text x="80" y="205" text-anchor="end" font-size="20" font-weight="bold" fill="#7c3aed">9.0</text>
-
-  <!-- 维度名称 -->
   <text x="250" y="50" text-anchor="middle" font-size="15" font-weight="600" fill="#475569">推免机会</text>
   <text x="432" y="200" text-anchor="middle" font-size="15" font-weight="600" fill="#475569">竞争友好</text>
   <text x="395" y="410" text-anchor="middle" font-size="15" font-weight="600" fill="#475569">成绩可控</text>
   <text x="105" y="410" text-anchor="middle" font-size="15" font-weight="600" fill="#475569">科研加分</text>
   <text x="68" y="190" text-anchor="middle" font-size="15" font-weight="600" fill="#475569">去向质量</text>
-
-  <!-- 中心综合分 -->
   <circle cx="250" cy="250" r="38" fill="#7c3aed" opacity="0.95"/>
   <text x="250" y="248" text-anchor="middle" font-size="22" font-weight="bold" fill="#fff">7.9</text>
   <text x="250" y="268" text-anchor="middle" font-size="11" fill="#fff" opacity="0.8">/ 10</text>
 </svg>
 
-<sub><b>示例：西安交通大学 · 自动化</b> · 综合评分 7.9 / 10</sub>
+<sub>示例：西安交通大学 · 自动化（电气信息类）</sub>
 
 </div>
 
-每个分数背后都有**原始数据 + 数据来源**：
+每个分数都对应具体的原始数据和文件来源，不是模糊评价：
 
-| 维度 | 分数 | 原始数据示例 | 数据来源 |
-|------|:----:|------------|---------|
-| 🎯 推免机会 | **8.5** | 学院保研率 28% · 专业保研率 32% · 特色班 55% | 西安交大 2024 推免实施细则 |
-| ⚔️ 竞争友好 | **6.0** | 保研竞争比 3:1 · 含强基/钱学森班分流 | 校友会调研 + 教务处数据 |
-| 📊 成绩可控 | **7.5** | 综合测评 70% 占比 · 4.3 制 · 规则透明 | 学籍管理办法 |
-| 🧪 科研加分 | **8.5** | 国家级实验室 · 电赛国一 +3 分 | 保研加分办法 |
-| 🏆 去向质量 | **9.0** | 本校直博 40% · C9 联盟 25% · 海外 8% | 升学统计公报 |
+| 维度 | 分数 | 原始数据 | 来源 |
+|------|:----:|---------|------|
+| 推免机会 | 8.5 | 学院 28% · 专业 32% · 特色班 55% | 西安交大 2024 推免实施细则 |
+| 竞争友好 | 6.0 | 保研竞争比约 3:1 | 校友会调研 |
+| 成绩可控 | 7.5 | 综合测评 70% · 4.3 制 | 学籍管理办法 |
+| 科研加分 | 8.5 | 国家级实验室 · 电赛国一 +3 分 | 保研加分办法 |
+| 去向质量 | 9.0 | 本校直博 40% · C9 联盟 25% | 升学统计公报 |
 
 ---
 
-## 🧠 AI Agent 工作原理
+## 主要功能
+
+### AI Agent 对话
+
+聊天页采用三栏布局（学生画像 / 对话区 / RAG 引用源），每次提问展示 5 步执行链：
+
+1. 分析学生画像
+2. 检索招生计划
+3. 查询保研政策
+4. 匹配院校专业
+5. 生成升学建议
+
+同场景下连续提问时，前 3 步会自动复用缓存秒过，省 token。
+
+输出走 SSE 流式协议，回答下方挂着推荐院校卡片和"下一步建议"按钮。
+还提供快速 / 深度两种模式，深度模式会多跑 2 步 + 多检索 2 个来源。
+
+### RAG 知识库引用
+
+8 类知识源：招生数据、录取数据、保研政策、专业信息、培养方案、奖学金政策、转专业政策、院校官网。
+
+聊天页右侧实时展示本次回答命中的引用源，点击卡片可以展开看原文摘录和命中理由。
+
+### 推荐结果决策看板
+
+主流程的关键产出页。顶部展示学生画像和推荐策略摘要，下方按冲 / 稳 / 保分类铺院校卡片（默认 10 所，匹配度倒序）。
+关键词（保研、985、跃迁等）会自动高亮。
+
+### 院校详情页
+
+按章节铺开：院校概览 → 专业详情（培养/就业/升学）→ 保研机会（5 维评估）→ 政策细则 → AI 升学建议。
+顶部 sticky tab 跟随滚动高亮。
+
+### AI 记忆
+
+聊天页头部有个浮窗按钮，展开后展示 Agent 从历史对话里累积的：
+对话中强调过的偏好、提及过的院校（按频次）、最近关注话题。
+让多轮对话有连续性，不用每次重新铺设上下文。
+
+### 管理员知识库后台
+
+`/admin/kb` 路由，管理员专属。包含统计看板（总文档数、向量切片数、覆盖类型）、
+按类型分布卡片、文档列表（搜索 + CRUD）、上传文档弹窗（自动切片入向量库）。
+
+---
+
+## 工作流程
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant U as 👤 用户
-  participant F as 🖥️ 前端
-  participant A as 🤖 Agent 编排
-  participant R as 📚 RAG 知识库
-  participant L as 🧠 LLM
+  participant U as 用户
+  participant F as 前端
+  participant A as Agent
+  participant R as RAG
+  participant L as LLM
 
-  U->>F: 输入"冲刺西安交大有多大把握？"
+  U->>F: 提问
   F->>A: POST /api/agent/chat (SSE)
-
-  Note over A: 5 步执行链开始
-
-  A-->>F: 🟣 step s1 · 分析学生画像
-  A-->>F: 🟣 step s2 · 检索招生计划
+  A-->>F: step s1-s5（流式推送）
   A->>R: 向量检索
-  R-->>A: top-K 相关文档
-  A-->>F: 🟣 step s3 · 查询保研政策
-  A-->>F: 🟣 step s4 · 匹配院校专业
-  A-->>F: 🟣 step s5 · 生成升学建议
-
-  A-->>F: 📚 sources（RAG 引用源）
-  A-->>F: 🎯 recommendations（推荐卡）
-
-  A->>L: 拼 prompt + 检索结果
-  loop 流式 token
-    L-->>A: token
-    A-->>F: 🔤 token (delta)
-    F-->>U: 🎬 逐字打字机
-  end
-
-  A-->>F: ➡️ next_actions（下一步建议）
-  A-->>F: ✅ done
-```
-
-**整个过程用户能看到 AI 在干什么**，不是"黑盒输出"。
-
----
-
-## 🗺️ 用户旅程
-
-```mermaid
-flowchart TB
-  Start([👤 进入系统]) --> Auth{已登录?}
-  Auth -- 否 --> Login[/🔐 登录页/]
-  Login --> Auth
-  Auth -- 是·学生 --> Home[/🏠 填写信息/]
-  Auth -- 是·管理员 --> Admin[/🛠️ 知识库后台/]
-
-  Home -->|提交画像| Results[/📊 推荐看板·10 所院校/]
-  Results -->|点击卡片| Detail[/🏫 院校详情·5 维评估/]
-  Results -->|勾选 2-5 所| Compare[/⚖️ 横向对比/]
-  Results -->|AI 咨询| Chat[/🤖 Agent 三栏对话/]
-  Results -->|生成报告| Report[/📋 志愿规划报告/]
-
-  Detail --> Chat
-  Compare --> Detail
-  Chat -.下一步建议.-> Detail
-  Chat -.下一步建议.-> Compare
-  Chat -.下一步建议.-> Report
-
-  Admin -->|CRUD 文档| KB[(🗄️ RAG 知识库)]
-  KB -.支撑.-> Chat
-
-  style Start fill:#e0e7ff
-  style Auth fill:#fef3c7
-  style Login fill:#fee2e2
-  style Home fill:#ddd6fe
-  style Results fill:#bbf7d0
-  style Detail fill:#bbf7d0
-  style Compare fill:#bbf7d0
-  style Chat fill:#a855f7,color:#fff
-  style Report fill:#bbf7d0
-  style Admin fill:#fce7f3
-  style KB fill:#fbcfe8
+  R-->>A: top-k 文档
+  A-->>F: sources + recommendations
+  A->>L: prompt + 检索结果
+  L-->>A: 流式 token
+  A-->>F: token (delta)
+  F-->>U: 逐字渲染
+  A-->>F: done
 ```
 
 ---
 
-## 📊 数据能力
+## 技术栈
 
-<div align="center">
-
-![院校](https://img.shields.io/badge/院校覆盖-3000+-6366f1?style=for-the-badge)
-![专业](https://img.shields.io/badge/专业方向-500+-8b5cf6?style=for-the-badge)
-![政策](https://img.shields.io/badge/政策资料-200+-a855f7?style=for-the-badge)
-![维度](https://img.shields.io/badge/推荐维度-12-c026d3?style=for-the-badge)
-
-![向量](https://img.shields.io/badge/向量切片-18,642-3b82f6?style=for-the-badge)
-![文档](https://img.shields.io/badge/RAG_文档-247-06b6d4?style=for-the-badge)
-![Embedding](https://img.shields.io/badge/Embedding-bge--large--zh--v1.5-10b981?style=for-the-badge)
-![维度](https://img.shields.io/badge/向量维度-1024-14b8a6?style=for-the-badge)
-
-</div>
+React 19 · TypeScript 6 · Vite 8 · React Router v7
+Tailwind v4 · shadcn/ui (new-york) · radix-ui · recharts
+axios · lucide-react · clsx · tailwind-merge
 
 ---
 
-## 🛠️ 技术栈
+## 路由
 
-<table>
-<tr>
-<td valign="top" width="33%">
-
-### 🎨 前端框架
-- **React 19**（含 Suspense）
-- **TypeScript 6**（strict mode）
-- **Vite 8**（极速 HMR）
-- **React Router v7**
-
-</td>
-<td valign="top" width="33%">
-
-### 💅 UI 系统
-- **Tailwind CSS v4**（@theme inline）
-- **shadcn/ui (new-york)**
-- **radix-ui**（无障碍底层）
-- **lucide-react**（图标）
-- **recharts**（雷达图）
-
-</td>
-<td valign="top" width="33%">
-
-### 🔧 工程化
-- **axios**（HTTP 预留）
-- **clsx + tailwind-merge**
-- **class-variance-authority**
-- **eslint**（含 typescript-eslint）
-- **localStorage** 持久化
-
-</td>
-</tr>
-</table>
+| 路由 | 用途 |
+|------|------|
+| `/login` | 登录页 |
+| `/` | 填表 |
+| `/results` | 推荐结果 |
+| `/detail/:id` | 院校详情 |
+| `/compare` | 横向对比 |
+| `/chat` | AI 咨询 |
+| `/report` | 规划报告 |
+| `/admin/kb` | 知识库后台（仅 admin） |
 
 ---
 
-## 🗺 路由与权限
-
-| 路由 | 用途 | 权限 |
-|------|------|:----:|
-| `/login` | 登录页（双角色一键填入） | 公开 |
-| `/` | 学生信息表单 + 产品介绍 | 🎓 / 👑 |
-| `/results` | 推荐结果决策看板 | 🎓 / 👑 |
-| `/detail/:id` | 院校详情（**苹果风 + 保研雷达图**） | 🎓 / 👑 |
-| `/compare` | 横向对比（2-5 所） | 🎓 / 👑 |
-| `/chat` | **AI Agent 三栏对话** | 🎓 / 👑 |
-| `/report` | 志愿规划报告（支持打印） | 🎓 / 👑 |
-| `/admin/kb` | 🛠 **RAG 知识库管理后台** | 👑 仅管理员 |
-
----
-
-## 🚀 快速开始
+## 跑起来
 
 ```bash
-# 克隆
 git clone https://github.com/mear9713/gaokao.git
 cd gaokao
-
-# 安装依赖
 npm install
-
-# 开发模式 → http://localhost:5173
 npm run dev
-
-# 生产构建（产物 gzip 后约 258 KB）
-npm run build
-npm run preview
 ```
 
-**首次访问** → 自动跳 `/login` → 演示账号一键登录 → 进入主流程。
+访问 `http://localhost:5173`，演示账号 `admin / admin123`（管理员）或 `student / 123456`（学生）。
 
 ---
 
-## 📂 项目结构
+## 后端对接
+
+后端只需要实现 9 个接口，前端的 service 层换掉 mock 即可：
+
+- 接口规范：[`docs/接口规范.md`](./docs/接口规范.md)
+- 数据采集：[`docs/数据收集要求.md`](./docs/数据收集要求.md)
+- 类型定义：[`src/types/index.ts`](./src/types/index.ts)
+- 适配层：[`src/services/agentApi.ts`](./src/services/agentApi.ts)（含 Mock 和真实 SSE 切换示例）
+
+| 接口 | 方法 | 用途 |
+|------|------|------|
+| `/api/auth/login` | POST | 登录 |
+| `/api/student/profile` | POST | 提交画像 |
+| `/api/recommend` | POST | 推荐列表 |
+| `/api/school/{id}` | GET | 院校详情（含 5 维评估） |
+| `/api/agent/chat` | POST | Agent SSE 流式 |
+| `/api/compare` | POST | 横向对比 |
+| `/api/report/generate` | POST | 生成报告 |
+| `/api/admin/kb` | GET | 知识库列表 |
+| `/api/admin/kb/{id}` | POST/DELETE | 知识库 CRUD |
+
+---
+
+## 目录结构
 
 ```
-gaokao-agent-frontend/
-├── 📁 docs/
-│   ├── 📄 接口规范.md           ⭐ 9 个 API 接口契约（给后端的核心文档）
-│   └── 📄 数据收集要求.md       8 类知识源采集规范
-│
-├── 📁 public/favicon.svg
-│
-└── 📁 src/
-    ├── 📁 pages/                8 个路由页面
-    │   ├── 🔐 LoginPage.tsx          登录（双角色一键填入）
-    │   ├── 🏠 InputPage.tsx          首页 + 学生信息表单
-    │   ├── 📊 ResultsPage.tsx        推荐结果决策看板
-    │   ├── 🏫 DetailPage.tsx         院校详情（苹果风 + 5 维雷达）
-    │   ├── ⚖️ ComparePage.tsx        横向对比
-    │   ├── 🤖 ChatPage.tsx           AI Agent 三栏对话
-    │   ├── 📋 ReportPage.tsx         志愿规划报告
-    │   └── 🛠 AdminKbPage.tsx        知识库管理后台（admin）
-    │
-    ├── 📁 components/
-    │   ├── auth/RequireAuth.tsx           🔐 路由权限守卫
-    │   ├── charts/PostgradRadarChart.tsx  🎯 保研 5 维雷达图
-    │   ├── layout/Navbar.tsx              顶部导航（含用户态）
-    │   └── ui/                            16 个 shadcn 组件 + Toast + 进度条
-    │
-    ├── 📁 context/
-    │   ├── AppContext.tsx       学生画像 + 对比清单
-    │   └── AuthContext.tsx      用户身份 + 权限
-    │
-    ├── 📁 services/
-    │   └── agentApi.ts          ⭐ Agent SSE 接口适配层（Mock + 真实切换示例）
-    │
-    ├── 📁 data/mockData.ts      所有 Mock 数据 + 响应生成器
-    ├── 📁 types/index.ts        ⭐ TypeScript 类型定义（单一真相源）
-    ├── 📁 hooks/                useAppContext / useAuth
-    ├── 📁 lib/utils.ts
-    ├── 🎨 index.css             Tailwind v4 + 设计 token
-    └── 🚀 main.tsx
+src/
+  pages/         8 个路由页面
+  components/    auth · charts · layout · ui
+  context/       AppContext + AuthContext
+  services/      agentApi.ts
+  data/          mockData.ts
+  types/         index.ts
+  hooks/         useAppContext · useAuth
+docs/
+  接口规范.md
+  数据收集要求.md
 ```
 
 ---
 
-## 🔌 给后端的对接资料
-
-| 文档 | 用途 |
-|------|------|
-| [`docs/接口规范.md`](./docs/接口规范.md) | **9 个 API 接口契约**（含 SSE 流式协议、字段、枚举）|
-| [`docs/数据收集要求.md`](./docs/数据收集要求.md) | 8 类知识源数据采集规范 |
-| [`src/types/index.ts`](./src/types/index.ts) | TypeScript 类型定义（所有字段以此为准）|
-| [`src/services/agentApi.ts`](./src/services/agentApi.ts) | Agent 接口适配层（Mock 实现 + 真实 SSE 切换示例）|
-
-### 📋 9 个接口速览
-
-| # | 方法 | 端点 | 用途 | 优先级 |
-|---|------|------|------|:----:|
-| 1 | POST | `/api/auth/login` | 登录 | 🔴 P0 |
-| 2 | POST | `/api/student/profile` | 提交画像 | 🔴 P0 |
-| 3 | POST | `/api/recommend` | 推荐院校 | 🔴 P0 |
-| 4 | GET | `/api/school/{id}` | 院校详情 + 5 维评估 | 🔴 P0 |
-| 5 | POST | **`/api/agent/chat`** | **Agent SSE 流式对话** | 🔴 P0 |
-| 6 | POST | `/api/compare` | 横向对比 | 🟡 P1 |
-| 7 | POST | `/api/report/generate` | 生成报告 | 🟡 P1 |
-| 8 | GET | `/api/admin/kb` | 知识库列表 | 🟢 P2 |
-| 9 | POST/DELETE | `/api/admin/kb/{id}` | 知识库 CRUD | 🟢 P2 |
-
-**对接成本**：后端就绪后，前端**只改 1 个文件**（`src/services/agentApi.ts`），UI 一行不动。
-
----
-
-## 📜 License
-
-MIT © 2026
-
----
-
-<div align="center">
-
-**💼 准备对接后端？** → 看 [`docs/接口规范.md`](./docs/接口规范.md)
-
-**🧪 想跑起来试试？** → `npm install && npm run dev`
-
-⭐ 觉得有用就给个 Star
-
-</div>
+License: MIT
