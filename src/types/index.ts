@@ -37,6 +37,29 @@ export interface SchoolRecommendation {
   reason: string
 }
 
+// ─── 保研 5 维评估 ────────────────────────────────────────
+export type PostgradDimensionId =
+  | 'opportunity'      // 推免机会
+  | 'competition'      // 竞争友好度（分数越高越友好）
+  | 'controllability'  // 成绩可控性
+  | 'extra'            // 科研竞赛加分空间
+  | 'destination'      // 升学去向质量
+
+export interface PostgradDimension {
+  id: PostgradDimensionId
+  name: string                                  // 中文名
+  score: number                                 // 0-10 分
+  reasoning: string                             // 一句话评估理由
+  rawData: { label: string; value: string }[]  // 原始数据 2-4 条
+  source: string                                // 数据来源（哪份文件）
+}
+
+export interface PostgradEvaluation {
+  dimensions: PostgradDimension[]   // 5 个维度
+  overallScore: number              // 综合得分 0-10
+  comment: string                   // 整体评价段落
+}
+
 // ─── 专业详情 ──────────────────────────────────────────────
 export interface MajorDetail {
   name: string
@@ -54,6 +77,8 @@ export interface MajorDetail {
   gradeCalculation: string
   graduationRequirements: string
   majorTransferPolicy: string
+  /** 保研 5 维评估（新版可视化用，可选向后兼容） */
+  postgradEvaluation?: PostgradEvaluation
 }
 
 // ─── 院校详情 ──────────────────────────────────────────────
@@ -144,10 +169,15 @@ export interface AgentResponse {
   nextActions: string[]
 }
 
+/** Agent 推理模式：快速 vs 深度 */
+export type AgentMode = 'quick' | 'deep'
+
 export interface AgentChatRequest {
   message: string
   studentInfo: StudentInfo
   history: ChatMessage[]
+  /** 推理模式（可选，默认 quick） */
+  mode?: AgentMode
 }
 
 // ─── Context 状态 ──────────────────────────────────────────
@@ -157,4 +187,26 @@ export interface AppContextState {
   setStudentInfo: (info: StudentInfo) => void
   toggleSelectedSchool: (id: string) => void
   clearSelectedSchools: () => void
+}
+
+// ─── 用户身份与权限 ──────────────────────────────────────
+export type UserRole = 'guest' | 'student' | 'admin'
+
+export interface AuthUser {
+  username: string
+  displayName: string
+  role: UserRole
+  /** Mock token，真实接入时替换为后端返回的 JWT */
+  token: string
+  /** 登录时间戳（用于 token 过期判断） */
+  loggedInAt: number
+}
+
+export interface AuthContextState {
+  user: AuthUser | null
+  isAdmin: boolean
+  isStudent: boolean
+  isAuthenticated: boolean
+  login: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>
+  logout: () => void
 }

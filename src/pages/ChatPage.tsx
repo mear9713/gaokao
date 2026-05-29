@@ -6,6 +6,7 @@ import {
   Loader2, CheckCircle2, ChevronRight, Library, MapPin,
   TrendingUp, Award, ArrowRight, BookOpen, BarChart3,
   History, Plus, ChevronDown, ChevronUp, Zap,
+  Brain, X, Microscope,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,13 +19,14 @@ import {
   mockStudentInfo,
   mockKnowledgeSources,
   mockQuickQuestions,
+  mockRecommendations,
   initialChatMessages,
 } from '@/data/mockData'
 import { chatWithAgent } from '@/services/agentApi'
 import type {
   ChatMessage, KnowledgeSource, AgentStep,
   SchoolRecommendation, AgentResponse, RecommendCategory,
-  AdmissionRisk, KnowledgeSourceType,
+  AdmissionRisk, KnowledgeSourceType, AgentMode,
 } from '@/types'
 
 // ─── 类型 ──────────────────────────────────────────────────
@@ -365,32 +367,350 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
   )
 }
 
-/** RAG 知识源卡片 */
+/** RAG 知识源卡片（可点击展开/收起原文片段） */
 function SourceCard({ src, active }: { src: KnowledgeSource; active: boolean }) {
+  // 命中的源默认展开，其它默认折叠；用户可手动 toggle
+  const [expanded, setExpanded] = useState(active)
+  const hasExcerpt = !!src.excerpt
+
   return (
-    <div className={`rounded-lg border p-2.5 space-y-1.5 transition-all ${
-      active ? 'border-primary/40 bg-primary/5 shadow-sm' : 'border-border'
+    <div className={`rounded-lg border transition-all ${
+      active ? 'border-primary/40 bg-primary/5 shadow-sm' : 'border-border hover:border-foreground/20'
     }`}>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <Badge className={`${SOURCE_TYPE_COLOR[src.type]} text-[10px] px-1.5 py-0 border`}>
-          {src.type}
-        </Badge>
-        {src.year && (
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-            {src.year}
+      <button
+        onClick={() => hasExcerpt && setExpanded(e => !e)}
+        className={`w-full text-left p-2.5 space-y-1.5 ${hasExcerpt ? 'cursor-pointer' : 'cursor-default'}`}
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge className={`${SOURCE_TYPE_COLOR[src.type]} text-[10px] px-1.5 py-0 border`}>
+            {src.type}
           </Badge>
-        )}
-      </div>
-      <div className="flex items-start gap-1.5">
-        <FileText className={`h-3 w-3 flex-shrink-0 mt-0.5 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
-        <p className="text-xs font-medium leading-tight">{src.title}</p>
-      </div>
-      <p className="text-[11px] text-muted-foreground pl-4">{src.source}</p>
-      {active && src.excerpt && (
-        <p className="text-[11px] text-foreground/70 pl-4 italic border-l-2 border-primary/30 ml-1">
-          "{src.excerpt}"
-        </p>
+          {src.year && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {src.year}
+            </Badge>
+          )}
+          {src.schoolName && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {src.schoolName}
+            </Badge>
+          )}
+          {hasExcerpt && (
+            <ChevronDown className={`h-3 w-3 ml-auto text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          )}
+        </div>
+        <div className="flex items-start gap-1.5">
+          <FileText className={`h-3 w-3 flex-shrink-0 mt-0.5 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
+          <p className="text-xs font-medium leading-tight">{src.title}</p>
+        </div>
+        <p className="text-[11px] text-muted-foreground pl-4">{src.source}</p>
+      </button>
+
+      {expanded && hasExcerpt && (
+        <div className="border-t border-border/40 px-2.5 py-2 bg-muted/30 animate-fade-in-up">
+          <p className="text-[11px] text-foreground/70 italic border-l-2 border-primary/30 pl-2">
+            "{src.excerpt}"
+          </p>
+          <p className="text-[10px] text-muted-foreground/70 mt-1.5">
+            💡 命中关联：{src.relevance}
+          </p>
+        </div>
       )}
+    </div>
+  )
+}
+
+// ─── AI 记忆浮窗（只记录对话中累积的有价值信息，不重复学生画像）─────
+function ContextMemoryButton({
+  messages,
+}: {
+  messages: ChatMessage[]
+}) {
+  const [open, setOpen] = useState(false)
+  const memory = extractMemory(messages)
+  const hasMemory =
+    memory.userEmphases.length > 0 ||
+    memory.mentionedSchools.length > 0 ||
+    memory.recentTopics.length > 0 ||
+    memory.userTurns > 0
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`relative inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+          open
+            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+            : 'bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100'
+        }`}
+        title="AI 在对话中积累的记忆"
+      >
+        <Brain className="h-3.5 w-3.5" />
+        AI 记忆
+        {hasMemory && (
+          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-purple-500" />
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-2xl shadow-xl z-50 animate-fade-in-up overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gradient-to-r from-purple-50 to-fuchsia-50/50">
+              <div className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-purple-600" />
+                <span className="font-semibold text-sm">AI 对话记忆</span>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="ml-auto text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Agent 从对话中自动累积的偏好与上下文，对话越多记忆越准
+              </p>
+            </div>
+
+            <div className="p-4 space-y-4 text-xs max-h-[60vh] overflow-y-auto">
+
+              {/* 对话中强调过的 */}
+              {memory.userEmphases.length > 0 ? (
+                <MemorySection icon="📌" title="对话中你强调过">
+                  <div className="space-y-1.5">
+                    {memory.userEmphases.map(item => (
+                      <div key={item.kw} className="flex items-start gap-2">
+                        <span className="text-purple-500 mt-0.5">·</span>
+                        <span className="text-foreground/80 flex-1">
+                          {item.label}
+                          {item.count > 1 && (
+                            <span className="text-[10px] text-muted-foreground ml-1">（{item.count} 次提及）</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </MemorySection>
+              ) : null}
+
+              {/* 提及过的院校 */}
+              {memory.mentionedSchools.length > 0 && (
+                <MemorySection icon="🏫" title="你提及过的院校">
+                  <div className="flex flex-wrap gap-1.5">
+                    {memory.mentionedSchools.map(s => (
+                      <span key={s.name} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {s.name}
+                        {s.count > 1 && (
+                          <span className="text-[9px] opacity-70">×{s.count}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </MemorySection>
+              )}
+
+              {/* 最近关注的话题 */}
+              {memory.recentTopics.length > 0 && (
+                <MemorySection icon="🔍" title="最近关注的话题">
+                  <div className="flex flex-wrap gap-1.5">
+                    {memory.recentTopics.map(t => (
+                      <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </MemorySection>
+              )}
+
+              {/* 会话统计 */}
+              <MemorySection icon="📊" title="会话状态">
+                <div className="space-y-1 text-foreground/80">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">对话轮数</span>
+                    <span className="font-medium tabular-nums">{memory.userTurns} 轮</span>
+                  </div>
+                  {memory.firstMessageAt && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">首次提问</span>
+                      <span className="font-medium">{formatRelativeTime(memory.firstMessageAt)}</span>
+                    </div>
+                  )}
+                  {memory.lastMessageAt && memory.userTurns > 1 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">最近提问</span>
+                      <span className="font-medium">{formatRelativeTime(memory.lastMessageAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </MemorySection>
+
+              {!hasMemory && (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Brain className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">还没有记忆</p>
+                  <p className="text-[10px] mt-1">开始对话后，Agent 会自动累积你的偏好</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function MemorySection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-foreground/80 mb-2 flex items-center gap-1.5">
+        <span>{icon}</span>
+        {title}
+      </p>
+      <div className="pl-1">{children}</div>
+    </div>
+  )
+}
+
+// ─── 记忆提取算法 ─────────────────────────────────────────
+interface ExtractedMemory {
+  userEmphases: { kw: string; label: string; count: number }[]
+  mentionedSchools: { name: string; count: number }[]
+  recentTopics: string[]
+  userTurns: number
+  firstMessageAt: number | null
+  lastMessageAt: number | null
+}
+
+function extractMemory(messages: ChatMessage[]): ExtractedMemory {
+  const userMsgs = messages.filter(m => m.role === 'user')
+  const allText = userMsgs.map(m => m.content).join('\n')
+
+  // 1. 强调过的偏好（关键词 + 解读文案）
+  const emphasisRules: { kw: string; label: string }[] = [
+    { kw: '保研',   label: '重视保研路径' },
+    { kw: '推免',   label: '关注推免机会' },
+    { kw: '直博',   label: '考虑直博深造' },
+    { kw: '985',    label: '偏好 985 院校' },
+    { kw: '211',    label: '认可 211 院校' },
+    { kw: '强基',   label: '关注强基计划' },
+    { kw: '英才班', label: '关注实验班 / 英才班' },
+    { kw: '冲刺',   label: '愿意接受冲刺' },
+    { kw: '稳妥',   label: '偏好稳妥方案' },
+    { kw: '保底',   label: '强调保底' },
+    { kw: '就业',   label: '看重就业去向' },
+    { kw: '考研',   label: '关注考研路径' },
+    { kw: '出国',   label: '考虑出国留学' },
+    { kw: '本省',   label: '偏好本省院校' },
+    { kw: '南方',   label: '倾向南方城市' },
+    { kw: '北方',   label: '倾向北方城市' },
+  ]
+  const userEmphases = emphasisRules
+    .map(r => ({
+      kw: r.kw,
+      label: r.label,
+      count: (allText.match(new RegExp(r.kw, 'g')) || []).length,
+    }))
+    .filter(e => e.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  // 2. 提到过的院校（用 mockRecommendations 院校名匹配）
+  const schoolCounter = new Map<string, number>()
+  mockRecommendations.forEach(rec => {
+    // 全名匹配
+    const fullCount = (allText.match(new RegExp(rec.schoolName, 'g')) || []).length
+    // 简称匹配（取前 4 字）
+    const shortName = rec.schoolName.replace(/大学|学院/, '')
+    const shortCount = shortName.length >= 2
+      ? (allText.match(new RegExp(shortName, 'g')) || []).length - fullCount
+      : 0
+    const total = fullCount + Math.max(0, shortCount)
+    if (total > 0) schoolCounter.set(rec.schoolName, total)
+  })
+  const mentionedSchools = Array.from(schoolCounter.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, count]) => ({ name, count }))
+
+  // 3. 最近关注话题
+  const topicRules: Record<string, string> = {
+    '保研|推免': '保研政策',
+    '分数|位次|录取': '录取概率',
+    '城市|地方|哪里': '地理位置',
+    '专业|计算机|电子|自动化': '专业方向',
+    '风险|把握|概率': '风险评估',
+    '就业|薪资|工作': '就业方向',
+    '对比|比较|vs': '院校对比',
+  }
+  const recentTopics: string[] = []
+  userMsgs.slice(-5).forEach(m => {
+    Object.entries(topicRules).forEach(([pattern, topic]) => {
+      if (new RegExp(pattern).test(m.content) && !recentTopics.includes(topic)) {
+        recentTopics.push(topic)
+      }
+    })
+  })
+
+  return {
+    userEmphases,
+    mentionedSchools,
+    recentTopics: recentTopics.slice(0, 5),
+    userTurns: userMsgs.length,
+    firstMessageAt: userMsgs[0]?.timestamp ?? null,
+    lastMessageAt: userMsgs[userMsgs.length - 1]?.timestamp ?? null,
+  }
+}
+
+// ─── 相对时间格式化 ───────────────────────────────────────
+function formatRelativeTime(ts: number): string {
+  const diff = Date.now() - ts
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  if (days > 0) return `${days} 天前`
+  if (hours > 0) return `${hours} 小时前`
+  if (minutes > 0) return `${minutes} 分钟前`
+  return '刚刚'
+}
+
+// ─── 模式切换器 ─────────────────────────────────────────
+function ModeSwitch({
+  mode, onChange, disabled,
+}: {
+  mode: AgentMode
+  onChange: (m: AgentMode) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-muted border">
+      <button
+        onClick={() => onChange('quick')}
+        disabled={disabled}
+        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 disabled:opacity-50 ${
+          mode === 'quick'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        title="快速回答：5 步 Agent + 3 source"
+      >
+        <Zap className="h-3 w-3" />
+        快速
+      </button>
+      <button
+        onClick={() => onChange('deep')}
+        disabled={disabled}
+        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 disabled:opacity-50 ${
+          mode === 'deep'
+            ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        title="深度分析：7 步 Agent + 5 source + 扩展段"
+      >
+        <Microscope className="h-3 w-3" />
+        深度
+      </button>
     </div>
   )
 }
@@ -427,6 +747,7 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessagesFromStorage())
   const [input, setInput] = useState('')
+  const [mode, setMode] = useState<AgentMode>('quick')
   const [phase, setPhase] = useState<ChatPhase>('idle')
   const [activeSteps, setActiveSteps] = useState<AgentStep[]>([])
   const [streamingContent, setStreamingContent] = useState('')
@@ -496,7 +817,7 @@ export default function ChatPage() {
     let collectedResponse: AgentResponse | null = null
 
     streamCtrlRef.current = chatWithAgent(
-      { message: text, studentInfo: info, history: messages },
+      { message: text, studentInfo: info, history: messages, mode },
       {
         onStep: (step, index) => {
           setActiveSteps(prev => {
@@ -561,7 +882,7 @@ export default function ChatPage() {
     if (collectedResponse) {
       // 占位（实际由 onAllStepsDone 触发）
     }
-  }, [info, messages])
+  }, [info, messages, mode])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -686,14 +1007,17 @@ export default function ChatPage() {
               <span className="font-semibold text-sm">高考志愿 AI Agent</span>
               <span className="text-[10px] text-muted-foreground">RAG 知识库 · 8 类 200+ 文档</span>
             </div>
-            {isLoading ? (
-              <Badge className="text-xs ml-auto bg-green-100 text-green-700 border-green-200">
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                {phase === 'agent-running' ? 'Agent 执行中' : '生成中'}
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="text-xs ml-auto">就绪</Badge>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              <ContextMemoryButton messages={messages} />
+              {isLoading ? (
+                <Badge className="text-xs bg-green-100 text-green-700 border-green-200">
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  {phase === 'agent-running' ? 'Agent 执行中' : '生成中'}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs">就绪</Badge>
+              )}
+            </div>
           </div>
 
           {/* 历史快速跳转条 */}
@@ -749,8 +1073,16 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* 模式切换 */}
+          <div className="px-3 pt-2 pb-1 border-t flex items-center justify-between">
+            <ModeSwitch mode={mode} onChange={setMode} disabled={isLoading} />
+            <span className="text-[10px] text-muted-foreground">
+              {mode === 'deep' ? '⚡ 7 步推理 + 5 来源 + 扩展分析' : '⚡ 5 步推理 + 3 来源'}
+            </span>
+          </div>
+
           {/* 输入区 */}
-          <div className="p-3 border-t flex gap-2 items-end">
+          <div className="p-3 pt-2 flex gap-2 items-end">
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}

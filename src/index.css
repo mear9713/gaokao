@@ -79,8 +79,82 @@
 }
 
 body {
-  background-color: hsl(var(--background));
+  /* 微妙的浅灰蓝背景 + 顶部柔和渐变（教育科技风） */
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(ellipse 1200px 600px at 50% -200px, rgba(99, 102, 241, 0.08), transparent 50%),
+    linear-gradient(180deg, #fbfcfe 0%, #f5f7fa 100%);
+  background-attachment: fixed;
   color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* ─── 产品级卡片样式工具类 ─── */
+.card-surface {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+.card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
+}
+
+/* ─── 数字字体（金融/数据感） ─── */
+.font-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ─── 数字大数字渐变（产品级数据展示） ─── */
+.text-gradient-blue {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.text-gradient-emerald {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ─── 入场动画 ─── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* 路由切换的页面进入动画（比 fade-in-up 更细腻、稍长） */
+@keyframes page-enter {
+  0% { opacity: 0; transform: translateY(12px); filter: blur(2px); }
+  60% { filter: blur(0px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
+}
+.animate-page-enter {
+  animation: page-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 骨架屏渐变动画 ─── */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-size: 2000px 100%;
+  animation: shimmer 2s infinite linear;
 }
 
 /* ─── 打印样式 ─── */

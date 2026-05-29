@@ -62,10 +62,14 @@ export interface StreamControl {
   cancel: () => void
 }
 
-/** 普通步骤动画时长（毫秒） */
-const STEP_DURATION_MS = 700
-/** 缓存复用步骤动画时长（秒过） */
-const STEP_DURATION_CACHED_MS = 180
+/** 普通步骤动画时长（毫秒）—— 调高到 850ms 让 Agent 显得更从容 */
+const STEP_DURATION_MS = 850
+/** 缓存复用步骤动画时长 */
+const STEP_DURATION_CACHED_MS = 220
+/** 步骤之间的缓冲（让用户能看清每步切换） */
+const STEP_GAP_MS = 120
+/** 最后一个步骤完成 → 开始流式 token 之前的停顿（让用户看完最后一步） */
+const PRE_STREAM_PAUSE_MS = 320
 /** 流式输出每帧字符数 */
 const STREAM_CHARS_PER_TICK_LONG = 5
 const STREAM_CHARS_PER_TICK_SHORT = 3
@@ -94,14 +98,15 @@ export function chatWithAgent(
   }
 
   try {
-    // 1. 生成完整响应（传入 history，让 Agent 感知上下文）
+    // 1. 生成完整响应（传入 history + mode，让 Agent 感知上下文与推理深度）
     const fullResponse = generateAgentResponse(
       request.message,
       request.studentInfo,
       request.history,
+      request.mode ?? 'quick',
     )
 
-    // 2. 推进 Agent 步骤动画（cached 步骤秒过）
+    // 2. 推进 Agent 步骤动画（每步之间留 STEP_GAP_MS 缓冲让用户能看清切换）
     let cumulativeTime = 0
     fullResponse.agentSteps.forEach((step, i) => {
       const duration = step.cached ? STEP_DURATION_CACHED_MS : STEP_DURATION_MS
@@ -117,11 +122,12 @@ export function chatWithAgent(
         callbacks.onStep?.({ ...step, status: 'done' }, i)
       }, stepStart + duration - 60)
 
-      cumulativeTime += duration
+      // 累加 = 本步时长 + 缓冲（最后一步不加缓冲，由 PRE_STREAM_PAUSE_MS 替代）
+      cumulativeTime += duration + (i < fullResponse.agentSteps.length - 1 ? STEP_GAP_MS : 0)
     })
 
-    // 3. 所有步骤完成后开始流式输出回答
-    const allStepsTime = cumulativeTime + 200
+    // 3. 所有步骤完成后停顿 PRE_STREAM_PAUSE_MS 再开始流式输出（让用户看完最后一步）
+    const allStepsTime = cumulativeTime + PRE_STREAM_PAUSE_MS
     addTimer(() => {
       callbacks.onAllStepsDone?.(fullResponse)
 

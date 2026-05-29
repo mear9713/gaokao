@@ -8,11 +8,7 @@
 
 ## 🔌 后端对接
 
-**所有接口规范文档在 [`docs/`](./docs/) 目录下，对接前请优先阅读：**
-
-- 📖 [docs/README.md](./docs/README.md) — 文档索引
-- 📖 [docs/API_AGENT_CHAT.md](./docs/API_AGENT_CHAT.md) — **AI Agent 流式对话接口规范 v1.0**
-  - 含 SSE 协议、字段定义、推送顺序约定、后端 Checklist、curl 测试模板
+数据采集需求见 **[`docs/数据收集要求.md`](./docs/数据收集要求.md)**
 
 前端接口适配层：[`src/services/agentApi.ts`](./src/services/agentApi.ts)
 真实后端就绪时只需替换此文件，UI 层无需改动。

@@ -3,10 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronRight, ChevronLeft, MapPin, ArrowUpRight,
   Sparkles, GraduationCap, Briefcase, Rocket,
+  Target, Swords, GaugeCircle, FlaskConical, Trophy,
+  ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { mockSchoolDetails } from '@/data/mockData'
 import { cn } from '@/lib/utils'
+import { PostgradRadarChart } from '@/components/charts/PostgradRadarChart'
+import type { PostgradDimension, PostgradDimensionId } from '@/types'
 
 // ─── Hooks ────────────────────────────────────────────────────
 
@@ -188,25 +192,7 @@ function DirectionCard({
   )
 }
 
-/** 保研率超大数字卡片（带计数动画） */
-function PostgradHeroNumber({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
-  const { ref, value: animated } = useCountUp(value)
-  return (
-    <div ref={ref} className="text-center">
-      <div className={cn(
-        'text-7xl md:text-8xl font-bold tracking-tighter tabular-nums leading-none',
-        accent
-          ? 'bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent'
-          : 'text-foreground'
-      )}>
-        {animated}<span className="text-4xl md:text-5xl ml-1">%</span>
-      </div>
-      <p className="text-sm text-muted-foreground mt-4 font-medium">{label}</p>
-    </div>
-  )
-}
-
-/** 保研率小卡（学院/专业/特色班） */
+/** 保研率小卡（兜底使用：老数据没有 postgradEvaluation 时） */
 function PostgradMetric({
   label, value, accent,
 }: { label: string; value: number; accent?: boolean }) {
@@ -231,7 +217,6 @@ function PostgradMetric({
         </span>
         <span className="text-xl text-muted-foreground font-medium">%</span>
       </div>
-      {/* 简洁进度条 */}
       <div className="h-1 bg-muted rounded-full mt-4 overflow-hidden">
         <div
           className={cn(
@@ -240,6 +225,150 @@ function PostgradMetric({
           )}
           style={{ width: `${value}%` }}
         />
+      </div>
+    </div>
+  )
+}
+
+/** 兜底版本：老数据没 postgradEvaluation 时显示 */
+function LegacyPostgradView({ majorDetail }: { majorDetail: { postgradRate: number; collegeName: string; collegePostgradRate: number; name: string; majorPostgradRate: number; honorsClassRate?: number } }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <PostgradMetric label="学校" value={majorDetail.postgradRate} />
+      <PostgradMetric label={majorDetail.collegeName} value={majorDetail.collegePostgradRate} />
+      <PostgradMetric label={majorDetail.name} value={majorDetail.majorPostgradRate} />
+      {majorDetail.honorsClassRate !== undefined && (
+        <PostgradMetric label="特色班" value={majorDetail.honorsClassRate} accent />
+      )}
+    </div>
+  )
+}
+
+// ─── 5 维评估视图 ───────────────────────────────────────
+const DIM_ICON_MAP: Record<PostgradDimensionId, typeof Target> = {
+  opportunity:     Target,
+  competition:     Swords,
+  controllability: GaugeCircle,
+  extra:           FlaskConical,
+  destination:     Trophy,
+}
+
+const DIM_COLOR_MAP: Record<PostgradDimensionId, string> = {
+  opportunity:     'bg-purple-100 text-purple-600',
+  competition:     'bg-emerald-100 text-emerald-600',
+  controllability: 'bg-blue-100 text-blue-600',
+  extra:           'bg-amber-100 text-amber-600',
+  destination:     'bg-rose-100 text-rose-600',
+}
+
+/** 单个维度详情卡（可展开看原始数据与来源） */
+function DimensionCard({ dim }: { dim: PostgradDimension }) {
+  const [expanded, setExpanded] = useState(false)
+  const Icon = DIM_ICON_MAP[dim.id]
+  const colorClass = DIM_COLOR_MAP[dim.id]
+
+  // 分数颜色：≥8 紫，≥6 蓝，<6 灰
+  const scoreColor =
+    dim.score >= 8 ? 'text-purple-700' :
+    dim.score >= 6 ? 'text-blue-700' :
+    'text-slate-500'
+
+  return (
+    <div className="group rounded-3xl border border-border/50 bg-background overflow-hidden hover:border-foreground/20 transition-colors">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full text-left p-5"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-start gap-3 mb-3">
+          <div className={cn('h-10 w-10 rounded-2xl flex items-center justify-center flex-shrink-0', colorClass)}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base leading-tight">{dim.name}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{dim.reasoning}</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <div className={cn('text-3xl font-bold tabular-nums leading-none', scoreColor)}>
+              {dim.score.toFixed(1)}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-1">/ 10.0</div>
+          </div>
+        </div>
+
+        {/* 分数条 */}
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-1000 ease-out',
+              dim.score >= 8 ? 'bg-gradient-to-r from-violet-500 to-purple-600' :
+              dim.score >= 6 ? 'bg-gradient-to-r from-blue-500 to-indigo-600' :
+              'bg-slate-400'
+            )}
+            style={{ width: `${dim.score * 10}%` }}
+          />
+        </div>
+
+        <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronDown className={cn('h-3 w-3 transition-transform', expanded && 'rotate-180')} />
+          {expanded ? '收起原始数据' : '查看原始数据与来源'}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border/40 bg-muted/20 px-5 py-4 space-y-3 animate-fade-in-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+            {dim.rawData.map(item => (
+              <div key={item.label} className="flex items-baseline justify-between text-xs">
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className="font-medium tabular-nums">{item.value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-3 border-t border-border/30 text-[11px] text-muted-foreground flex items-start gap-1.5">
+            <span className="font-semibold">📚 数据来源</span>
+            <span>·</span>
+            <span className="italic flex-1">{dim.source}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 5 维评估完整视图：雷达图 + 综合卡 + 5 个维度卡片 */
+function PostgradEvaluationView({ evaluation }: { evaluation: { dimensions: PostgradDimension[]; overallScore: number; comment: string } }) {
+  const { ref: scoreRef, value: animatedScore } = useCountUp(Math.round(evaluation.overallScore * 10))
+
+  return (
+    <div className="space-y-6">
+      {/* 雷达图 + 综合评分 双列 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr,1fr] gap-4">
+        {/* 左：雷达图 */}
+        <div className="bg-gradient-to-br from-violet-50/60 via-fuchsia-50/30 to-background rounded-3xl border border-purple-100 p-4 md:p-6 overflow-hidden">
+          <PostgradRadarChart evaluation={evaluation as { dimensions: PostgradDimension[]; overallScore: number; comment: string }} />
+        </div>
+
+        {/* 右：综合评分卡 */}
+        <div ref={scoreRef} className="rounded-3xl border border-border/50 bg-background p-6 md:p-8 flex flex-col">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">综合评分</p>
+          <div className="flex items-baseline gap-2 mb-4">
+            <span className="text-6xl md:text-7xl font-bold tracking-tighter tabular-nums bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
+              {(animatedScore / 10).toFixed(1)}
+            </span>
+            <span className="text-xl text-muted-foreground font-medium">/ 10</span>
+          </div>
+          <p className="text-sm text-foreground/80 leading-relaxed flex-1">
+            {evaluation.comment}
+          </p>
+        </div>
+      </div>
+
+      {/* 5 个维度详情卡 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {evaluation.dimensions.map(dim => (
+          <DimensionCard key={dim.id} dim={dim} />
+        ))}
       </div>
     </div>
   )
@@ -460,37 +589,22 @@ export default function DetailPage() {
           </div>
         </Section>
 
-        {/* 保研机会 */}
+        {/* 保研机会（5 维评估） */}
         <Section
           id="postgrad"
           eyebrow="POSTGRADUATE"
-          title="保研机会"
-          subtitle="保研率越高，意味着大学期间获得名校研究生通道的概率越大。"
+          title="保研机会 · 5 维评估"
+          subtitle="从推免机会、竞争友好度、成绩可控性、科研加分空间、升学去向 5 个维度综合评估保研生态，0-10 分制，每项标注原始数据与来源。"
         >
-          {/* Hero 大数字（特色班优先） */}
-          <div className="relative bg-gradient-to-br from-violet-50/80 via-fuchsia-50/40 to-background rounded-[2rem] border border-purple-100 p-12 md:p-16 mb-8 overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-72 h-72 bg-purple-200/30 rounded-full blur-3xl" />
-            <div className="relative">
-              <PostgradHeroNumber
-                value={detail.majorDetail.honorsClassRate ?? detail.majorDetail.majorPostgradRate}
-                label={detail.majorDetail.honorsClassRate !== undefined ? '特色班 / 实验班保研率' : `${detail.majorDetail.name}保研率`}
-                accent
-              />
-            </div>
-          </div>
-
-          {/* 3-4 个对比卡 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <PostgradMetric label="学校" value={detail.majorDetail.postgradRate} />
-            <PostgradMetric label={detail.majorDetail.collegeName} value={detail.majorDetail.collegePostgradRate} />
-            <PostgradMetric label={detail.majorDetail.name} value={detail.majorDetail.majorPostgradRate} />
-            {detail.majorDetail.honorsClassRate !== undefined && (
-              <PostgradMetric label="特色班" value={detail.majorDetail.honorsClassRate} accent />
-            )}
-          </div>
+          {detail.majorDetail.postgradEvaluation ? (
+            <PostgradEvaluationView evaluation={detail.majorDetail.postgradEvaluation} />
+          ) : (
+            // 兜底：老数据没 postgradEvaluation 时显示简版
+            <LegacyPostgradView majorDetail={detail.majorDetail} />
+          )}
 
           <p className="text-sm text-muted-foreground mt-8 leading-relaxed border-l-2 border-purple-200 pl-4">
-            💡 特色班 / 实验班保研率远高于普通班，入学后可以争取通过选拔进入。竞赛获奖、科研经历、GPA 都是关键指标。
+            💡 5 维评估均为 0-10 分制。"竞争友好度" 分数越高代表竞争压力越小；其他维度均为分数越高越好。每个维度可展开查看原始数据与数据来源。
           </p>
         </Section>
 

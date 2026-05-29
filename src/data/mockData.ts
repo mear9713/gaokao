@@ -6,6 +6,7 @@ import type {
   KnowledgeSource,
   AgentResponse,
   AgentStep,
+  AgentMode,
 } from '@/types'
 
 // ─── 默认学生信息 ──────────────────────────────────────────
@@ -205,6 +206,77 @@ export const mockSchoolDetails: SchoolDetail[] = [
         '毕业总学分≥170学分；英语四级成绩需达到425分；需完成毕业设计并通过答辩；参加学校组织的思政教育不少于32学时',
       majorTransferPolicy:
         '大一结束可申请院内转专业，大二结束可申请跨院转专业；综合成绩排名前20%方可提出申请；热门专业（计算机等）竞争激烈',
+      postgradEvaluation: {
+        overallScore: 7.9,
+        comment: '西安交大该专业保研体系成熟，机会丰富、去向优质，但竞争较激烈；适合有规划意识、能稳定保持 GPA 前 30% 的学生。',
+        dimensions: [
+          {
+            id: 'opportunity',
+            name: '推免机会',
+            score: 8.5,
+            reasoning: '该专业保研率稳定在 32%，特色班可达 55%，整体名额充足',
+            rawData: [
+              { label: '学院保研率', value: '28%' },
+              { label: '专业保研率', value: '32%' },
+              { label: '特色班保研率', value: '55%' },
+              { label: '近年推免人数', value: '~120 人/年' },
+            ],
+            source: '西安交通大学 2024 年推免实施细则',
+          },
+          {
+            id: 'competition',
+            name: '竞争友好度',
+            score: 6.0,
+            reasoning: '热门专业生源 GPA 集中度高，但有强基/钱学森班分流，普通班竞争压力中等',
+            rawData: [
+              { label: '专业热门度', value: '★★★★★' },
+              { label: '生源 GPA 分布', value: '集中 3.5-4.0' },
+              { label: '保研名额竞争比', value: '约 3:1' },
+              { label: '实验班分流', value: '钱学森班 / 强基班 / 少年班' },
+            ],
+            source: '校友会调研 + 教务处公开数据',
+          },
+          {
+            id: 'controllability',
+            name: '成绩可控性',
+            score: 7.5,
+            reasoning: '保研主要看综合测评（学业 70% + 科研 20% + 综合 10%），规则清晰可提前规划',
+            rawData: [
+              { label: '保研核心指标', value: '综合测评排名' },
+              { label: '学业成绩占比', value: '70%' },
+              { label: 'GPA 制度', value: '4.3 制' },
+              { label: '挂科风险', value: '中（高数 / 大物 较难）' },
+            ],
+            source: '西安交通大学 2024 版本科生学籍管理办法',
+          },
+          {
+            id: 'extra',
+            name: '科研竞赛加分空间',
+            score: 8.5,
+            reasoning: '电气学院实验室资源丰富，全国大赛保研加分政策明确，对加分大方',
+            rawData: [
+              { label: '国家级实验室', value: '电力设备电气绝缘国家重点实验室' },
+              { label: '主流竞赛加分', value: '全国大学生电子设计大赛 +3 分' },
+              { label: '科研项目机会', value: '大三起可加入导师课题组' },
+              { label: '本科生发表', value: '约 5% 学生发表 SCI/EI' },
+            ],
+            source: '西安交通大学电气工程学院 2024 年保研加分办法',
+          },
+          {
+            id: 'destination',
+            name: '升学去向质量',
+            score: 9.0,
+            reasoning: '本校直博比例高，外推清北、中科院、海外名校占比可观',
+            rawData: [
+              { label: '本校直博占比', value: '~40%' },
+              { label: 'C9 联盟去向', value: '~25%' },
+              { label: '中科院 / 工程院', value: '~10%' },
+              { label: '海外 Top50', value: '~8%' },
+            ],
+            source: '西安交大 2024 届毕业生升学统计公报',
+          },
+        ],
+      },
     },
     personalizedAdvice:
       '你的分数(568分，位次15000)冲刺西安交大具有一定风险，但并非不可能。建议同时关注自动化和电气工程两个专业，自动化更热门但竞争更激烈。若选择报考，建议作为冲刺志愿，同时配置中南大学/湖南大学作为稳妥选项。西安交大的保研率高达22%，对于目标保研的你来说是极具吸引力的平台，一旦进入，保研资源非常丰富。',
@@ -243,12 +315,83 @@ export const mockSchoolDetails: SchoolDetail[] = [
         '修满168学分；英语四级成绩≥425分；毕业设计答辩通过；完成不少于1学期的工程实习',
       majorTransferPolicy:
         '前两学期内可申请系内转专业；全校转专业在大一期末进行；英才班/竞赛班学生享有优先权',
+      postgradEvaluation: {
+        overallScore: 8.0,
+        comment: '电科大电子信息保研生态在国内顶尖，名额、加分政策、去向都极有竞争力；适合目标明确投身电子/通信/AI 行业的学生。',
+        dimensions: [
+          {
+            id: 'opportunity',
+            name: '推免机会',
+            score: 9.0,
+            reasoning: '电科大整体保研率 25%，电子信息工程专业 38%，英才班接近 60%',
+            rawData: [
+              { label: '学院保研率', value: '32%' },
+              { label: '专业保研率', value: '38%' },
+              { label: '英才实验班保研率', value: '58%' },
+              { label: '近年推免人数', value: '~180 人/年' },
+            ],
+            source: '电子科技大学 2024 年推免生工作实施细则',
+          },
+          {
+            id: 'competition',
+            name: '竞争友好度',
+            score: 6.5,
+            reasoning: '行业热度高，但英才班/未来精英班直接保研，缓解了普通班竞争',
+            rawData: [
+              { label: '专业热门度', value: '★★★★★' },
+              { label: '生源 GPA 分布', value: '集中 3.6-4.0' },
+              { label: '保研名额竞争比', value: '约 2.5:1' },
+              { label: '实验班分流', value: '英才实验班 / 未来精英班' },
+            ],
+            source: '电科大教务处 + 校友会调研',
+          },
+          {
+            id: 'controllability',
+            name: '成绩可控性',
+            score: 7.0,
+            reasoning: '综合排名公式偏重学业（65%），但竞赛科研占比 25% 高于其他学校',
+            rawData: [
+              { label: '保研核心指标', value: '综合测评排名' },
+              { label: '学业成绩占比', value: '65%' },
+              { label: 'GPA 制度', value: '4.0 制' },
+              { label: '挂科风险', value: '中（电路 / 信号系统 较难）' },
+            ],
+            source: '电科大本科生培养方案',
+          },
+          {
+            id: 'extra',
+            name: '科研竞赛加分空间',
+            score: 9.0,
+            reasoning: '电子设计大赛、ACM、信安等含金量赛事密集，加分政策给力',
+            rawData: [
+              { label: '国家级实验室', value: '电磁辐射控制材料国家工程实验室' },
+              { label: '主流竞赛加分', value: '全国电赛国一 +3 分' },
+              { label: '科研项目机会', value: '大二即可加入实验室' },
+              { label: '本科生发表', value: '约 8% 学生有 SCI/EI' },
+            ],
+            source: '电科大保研加分政策 2024 版',
+          },
+          {
+            id: 'destination',
+            name: '升学去向质量',
+            score: 8.5,
+            reasoning: '本校直博 + 清北/中科院 + 海外名校均有可观比例',
+            rawData: [
+              { label: '本校直博占比', value: '~50%' },
+              { label: 'C9 联盟去向', value: '~20%' },
+              { label: '中科院相关所', value: '~12%' },
+              { label: '海外 Top50', value: '~10%' },
+            ],
+            source: '电科大 2024 届毕业生升学统计',
+          },
+        ],
+      },
     },
     personalizedAdvice:
       '电子科大是你最应重点考虑的冲刺高校之一。以568分、位次15000在湖南冲刺电科大有较大可能性，尤其是电子信息类专业。成都的生活节奏与长沙相近，城市适应成本低。电科大的保研率高达25%，且电子/通信方向就业极强，对于重视保研和就业的你而言是最优的冲刺选择。建议关注电科大的"英才实验班"——每年60名，保研率接近100%。',
   },
   {
-    id: 'school_003',
+    id: 'school_004',
     schoolName: '中南大学',
     city: '长沙',
     province: '湖南',
@@ -281,12 +424,83 @@ export const mockSchoolDetails: SchoolDetail[] = [
         '毕业学分≥165学分；英语四级必须通过；毕业论文需经查重（相似度<30%）；参加专业实习不少于8周',
       majorTransferPolicy:
         '大一末可申请校内转专业；医学类专业对外开放转入名额极少；计算机为热门专业，转入竞争激烈',
+      postgradEvaluation: {
+        overallScore: 7.4,
+        comment: '中南综合实力均衡，保研机会稳健、竞争友好度较高、规则透明；是想要稳妥推免、避开顶尖名校激烈竞争的优选。',
+        dimensions: [
+          {
+            id: 'opportunity',
+            name: '推免机会',
+            score: 7.0,
+            reasoning: '学校 16% + 学院 20% + 专业 25%，比顶尖 985 低但绝对名额仍可观',
+            rawData: [
+              { label: '学院保研率', value: '20%' },
+              { label: '专业保研率', value: '25%' },
+              { label: '特色班保研率', value: '45%' },
+              { label: '近年推免人数', value: '~50 人/年（计算机院）' },
+            ],
+            source: '中南大学计算机学院 2024 年推免实施办法',
+          },
+          {
+            id: 'competition',
+            name: '竞争友好度',
+            score: 7.5,
+            reasoning: '生源压力小于 C9，分流机制明确，普通学生有较大上升空间',
+            rawData: [
+              { label: '专业热门度', value: '★★★★' },
+              { label: '生源 GPA 分布', value: '分布较均匀' },
+              { label: '保研名额竞争比', value: '约 2:1' },
+              { label: '实验班分流', value: '计算机拔尖班' },
+            ],
+            source: '中南教务处公开统计',
+          },
+          {
+            id: 'controllability',
+            name: '成绩可控性',
+            score: 8.0,
+            reasoning: '综合测评以 GPA 为主（70%），规则透明，挂科机制宽松',
+            rawData: [
+              { label: '保研核心指标', value: '综合测评排名' },
+              { label: '学业成绩占比', value: '70%' },
+              { label: 'GPA 制度', value: '4.0 制' },
+              { label: '挂科风险', value: '低（补考后按 60 分记录）' },
+            ],
+            source: '中南大学本科生培养方案',
+          },
+          {
+            id: 'extra',
+            name: '科研竞赛加分空间',
+            score: 7.0,
+            reasoning: '与中科院、北航有联培项目，加分机制清晰但赛事密度低于电科大',
+            rawData: [
+              { label: '国家级实验室', value: '高性能复杂制造国家重点实验室' },
+              { label: '主流竞赛加分', value: 'ACM 国一 +2 分' },
+              { label: '科研项目机会', value: '联培项目 12 个名额' },
+              { label: '本科生发表', value: '约 4% 学生有 SCI/EI' },
+            ],
+            source: '中南大学 2024 年保研补充加分细则',
+          },
+          {
+            id: 'destination',
+            name: '升学去向质量',
+            score: 7.5,
+            reasoning: '推免至北航、浙大、同济、武大等，去向质量好',
+            rawData: [
+              { label: '本校直博占比', value: '~35%' },
+              { label: 'C9 联盟去向', value: '~15%' },
+              { label: '中科院 / 北航联培', value: '~10%' },
+              { label: '海外 Top100', value: '~5%' },
+            ],
+            source: '中南计算机学院 2024 届升学统计',
+          },
+        ],
+      },
     },
     personalizedAdvice:
       '对湖南考生而言，中南大学是性价比最高的稳妥选择之一。你的568分、位次15000相比往年中南大学计算机录取线(571分，位次14000)仅差一点点，属于边缘地带，报考有一定风险但概率合理。建议选择计算机或电子信息类（后者录取可能更宽松）。如果你主要目标是保研，中南的16%保研率加上与北航、浙大等的联培机会，能让你在保研赛道上很有竞争力。',
   },
   {
-    id: 'school_004',
+    id: 'school_005',
     schoolName: '湖南大学',
     city: '长沙',
     province: '湖南',
@@ -319,12 +533,83 @@ export const mockSchoolDetails: SchoolDetail[] = [
         '毕业学分≥170学分；英语四级≥425分；完成毕业设计并通过答辩；参加至少1次大型创新创业项目',
       majorTransferPolicy:
         '大一结束可申请院内转专业；综合成绩前30%方可申请；工科转工科相对宽松，跨大类转专业需特别申请',
+      postgradEvaluation: {
+        overallScore: 7.6,
+        comment: '湖大特点是强基班保研率极高 + 本地生源友好 + 规则透明，是湖南本地考生上行通道最丝滑的选择之一。',
+        dimensions: [
+          {
+            id: 'opportunity',
+            name: '推免机会',
+            score: 6.5,
+            reasoning: '专业保研 22% 中等水平，但强基班高达 52%，名额向特色班倾斜',
+            rawData: [
+              { label: '学院保研率', value: '18%' },
+              { label: '专业保研率', value: '22%' },
+              { label: '强基班保研率', value: '52%' },
+              { label: '近年推免人数', value: '~40 人/年（电气院）' },
+            ],
+            source: '湖南大学电气与信息工程学院 2024 推免实施办法',
+          },
+          {
+            id: 'competition',
+            name: '竞争友好度',
+            score: 8.0,
+            reasoning: '本地生源占比高，竞争压力较小，强基班单独排名',
+            rawData: [
+              { label: '专业热门度', value: '★★★★' },
+              { label: '生源 GPA 分布', value: '正态分布较好' },
+              { label: '保研名额竞争比', value: '约 1.5:1' },
+              { label: '实验班分流', value: '强基班 / 卓越工程师班' },
+            ],
+            source: '湖南大学教务处统计',
+          },
+          {
+            id: 'controllability',
+            name: '成绩可控性',
+            score: 8.5,
+            reasoning: '综合评定学业占比高（75%），强基班有专门学业辅导',
+            rawData: [
+              { label: '保研核心指标', value: '学业成绩排名' },
+              { label: '学业成绩占比', value: '75%' },
+              { label: 'GPA 制度', value: '4.0 制' },
+              { label: '挂科风险', value: '低（强基班有补习）' },
+            ],
+            source: '湖南大学 2024 版本科生培养方案',
+          },
+          {
+            id: 'extra',
+            name: '科研竞赛加分空间',
+            score: 7.5,
+            reasoning: '电气工程实验室资源好，新能源企业合作多',
+            rawData: [
+              { label: '国家级实验室', value: '汽车车身先进设计制造国家重点实验室' },
+              { label: '主流竞赛加分', value: '电赛省一 +1 分' },
+              { label: '科研项目机会', value: '强基班大二可申请' },
+              { label: '校企联合项目', value: '比亚迪、宁德时代' },
+            ],
+            source: '湖南大学 2024 保研加分政策',
+          },
+          {
+            id: 'destination',
+            name: '升学去向质量',
+            score: 7.5,
+            reasoning: '主要去向浙大、电科大、本校直博，海外申请较少',
+            rawData: [
+              { label: '本校直博占比', value: '~45%' },
+              { label: '985 名校去向', value: '~30%' },
+              { label: '中科院相关所', value: '~5%' },
+              { label: '海外名校', value: '~3%' },
+            ],
+            source: '湖南大学 2024 届升学报告',
+          },
+        ],
+      },
     },
     personalizedAdvice:
       '湖南大学是你最稳妥的选择，你的568分（位次15000）与往年湖南大学电子信息类录取线（569分，位次14800）非常接近。作为湖南本地985高校，你有明显的地域优势。湖南大学的"强基班"是一个值得关注的机会——强基班保研率超52%，且有额外的学业辅导和竞赛支持，非常适合你的保研目标。建议将湖南大学作为核心稳妥志愿，搭配1-2个冲刺志愿和1个保底志愿。',
   },
   {
-    id: 'school_005',
+    id: 'school_008',
     schoolName: '南京邮电大学',
     city: '南京',
     province: '江苏',
@@ -357,6 +642,77 @@ export const mockSchoolDetails: SchoolDetail[] = [
         '修满162学分；英语四级≥425分；毕业设计查重通过；参加企业实习不少于6周',
       majorTransferPolicy:
         '大一末可申请院内转专业（名额有限）；跨院转专业较难；信息安全专业有保密要求，转出申请需审核',
+      postgradEvaluation: {
+        overallScore: 7.2,
+        comment: '南邮保研名额不算多，但行业定向培养项目（华为等）非常有特色，竞争压力小，适合行业方向明确的同学。',
+        dimensions: [
+          {
+            id: 'opportunity',
+            name: '推免机会',
+            score: 5.0,
+            reasoning: '专业保研率 15%，低于头部 211，但行业定向项目可作为替代上行通道',
+            rawData: [
+              { label: '学院保研率', value: '13%' },
+              { label: '专业保研率', value: '15%' },
+              { label: '英才班保研率', value: '38%' },
+              { label: '近年推免人数', value: '~25 人/年' },
+            ],
+            source: '南京邮电大学 2024 推免实施细则',
+          },
+          {
+            id: 'competition',
+            name: '竞争友好度',
+            score: 8.5,
+            reasoning: '生源压力较小，行业定向班单独占用名额减轻普通生竞争',
+            rawData: [
+              { label: '专业热门度', value: '★★★' },
+              { label: '生源 GPA 分布', value: '分布均匀' },
+              { label: '保研名额竞争比', value: '约 1.2:1' },
+              { label: '实验班分流', value: '华为定向班 / 信安特长班' },
+            ],
+            source: '南邮教务处招生数据',
+          },
+          {
+            id: 'controllability',
+            name: '成绩可控性',
+            score: 7.5,
+            reasoning: 'GPA 占 70%，规则透明，但需要严格保持前 15%',
+            rawData: [
+              { label: '保研核心指标', value: '综合排名' },
+              { label: '学业成绩占比', value: '70%' },
+              { label: 'GPA 制度', value: '4.0 制' },
+              { label: '挂科风险', value: '中（信号系统、通信原理较难）' },
+            ],
+            source: '南邮本科生培养方案',
+          },
+          {
+            id: 'extra',
+            name: '科研竞赛加分空间',
+            score: 8.0,
+            reasoning: '与华为等通信企业有定向联培项目（不占推免名额），等同于额外通道',
+            rawData: [
+              { label: '国家级实验室', value: '宽带无线通信与传感网技术教育部重点实验室' },
+              { label: '主流竞赛加分', value: '电信杯、信安大赛' },
+              { label: '科研项目机会', value: '华为定向班 ~30 人/年' },
+              { label: '本科生发表', value: '约 3% 学生有 EI' },
+            ],
+            source: '南邮 2024 保研补充政策',
+          },
+          {
+            id: 'destination',
+            name: '升学去向质量',
+            score: 7.0,
+            reasoning: '主要推免至东南、南大、浙大，海外较少但通信行业认可度高',
+            rawData: [
+              { label: '本校直博占比', value: '~30%' },
+              { label: '东南 / 南大去向', value: '~25%' },
+              { label: '浙大 / 上交去向', value: '~10%' },
+              { label: '海外名校', value: '~5%' },
+            ],
+            source: '南邮 2024 届升学统计',
+          },
+        ],
+      },
     },
     personalizedAdvice:
       '南京邮电大学是你作为保底志愿的理想选择。568分（位次15000）高出往年南邮录取线约10分，录取确定性很高。南邮的通信特色强，以电子信息工程为跳板，就业进入运营商/通信大厂非常顺畅。虽然保研率（10%）不如顶尖211，但南邮以"行业定向培养"见长，如果未来就业倾向于通信行业，南邮是一个非常务实的选择。',
@@ -680,9 +1036,11 @@ export function generateAgentResponse(
   message: string,
   info: StudentInfo,
   history: ChatMessage[] = [],
+  mode: AgentMode = 'quick',
 ): AgentResponse {
   const scenario = detectScenario(message)
   const stepDetails = getStepDetails(scenario, info)
+  const isDeep = mode === 'deep'
 
   // 判断是不是第 1 轮（仅有欢迎消息不算用户提问）
   const userTurns = history.filter(m => m.role === 'user').length
@@ -692,8 +1050,8 @@ export function generateAgentResponse(
   const lastScenario = getLastScenarioFromHistory(history)
   const isSameScenario = lastScenario !== null && lastScenario === scenario
 
-  // 构建步骤：根据上下文标记 cached
-  const agentSteps: AgentStep[] = [
+  // 基础 5 步
+  const baseSteps: AgentStep[] = [
     {
       id: 's1', icon: 'profile', status: 'pending',
       label: isFirstTurn ? '正在分析学生画像...' : '已加载学生画像',
@@ -726,11 +1084,55 @@ export function generateAgentResponse(
     },
   ]
 
+  // 深度模式：追加 2 个步骤
+  const deepExtraSteps: AgentStep[] = isDeep ? [
+    {
+      id: 's6', icon: 'policy', status: 'pending',
+      label: '正在交叉验证多个数据源...',
+      detail: '比对 2024 招生数据、推免实施细则、培养方案、学科评估 4 类来源，剔除矛盾信息',
+      cached: false,
+    },
+    {
+      id: 's7', icon: 'generate', status: 'pending',
+      label: '正在生成扩展分析...',
+      detail: '基于交叉验证结果输出深度洞察、潜在风险与差异化策略',
+      cached: false,
+    },
+  ] : []
+
+  const agentSteps = [...baseSteps, ...deepExtraSteps]
+
+  // 基础源
+  const baseSources = getSourcesForScenario(scenario)
+  // 深度模式：sources 数量翻倍（至少 5 个）
+  const sources = isDeep
+    ? [...baseSources, ...mockKnowledgeSources.filter(s => !baseSources.find(b => b.id === s.id))].slice(0, 5)
+    : baseSources
+
+  // 答案：深度模式末尾追加扩展段
+  const baseAnswer = getAnswerForScenario(scenario, info)
+  const deepSuffix = isDeep ? `
+
+━━━━━━━━━━━━━━━━━━━━
+
+🔬 **深度分析（多源交叉验证）**
+
+**1. 数据可信度核查**
+经过对比 ${baseSources.length + 2} 份原始文件（招生数据、推免细则、培养方案、学科评估），上述结论的核心数据相互印证，可信度高。
+
+**2. 潜在风险提示**
+- 政策每年微调（特别是保研比例），需关注 ${new Date().getFullYear() + 1} 年最新版细则
+- 当年招生计划数变化可能导致录取位次浮动 ±1500 名
+
+**3. 差异化策略建议**
+基于你的画像（${info.province}/${info.score}分/${info.riskPreference}型），如果只能选一个核心策略，建议：**${info.careAboutPostgrad ? '优先冲击保研率突出且有特色班的院校' : '优先匹配地域+专业实力综合最优的稳妥方案'}**。`
+    : ''
+
   return {
-    answer: getAnswerForScenario(scenario, info),
+    answer: baseAnswer + deepSuffix,
     agentSteps,
     recommendations: getRecommendationsForScenario(scenario, info),
-    sources: getSourcesForScenario(scenario),
+    sources,
     nextActions: getNextActionsForScenario(scenario),
   }
 }
