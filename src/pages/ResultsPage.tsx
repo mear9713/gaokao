@@ -190,9 +190,7 @@ export default function ResultsPage() {
   if (loadState === 'loading') {
     return (
       <StatusShell>
-        <Loader2 className="h-10 w-10 mx-auto mb-5 text-indigo-500 animate-spin" />
-        <p className="text-lg font-medium mb-1">{statusText}</p>
-        <p className="text-sm text-muted-foreground">AI 正在检索招生 / 保研数据并匹配院校，请稍候…</p>
+        <LoadingProgress statusText={statusText} />
       </StatusShell>
     )
   }
@@ -514,6 +512,109 @@ function Metric({ label, value }: { label: string; value: React.ReactNode }) {
     <div>
       <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{label}</p>
       <div className="text-sm font-medium">{value}</div>
+    </div>
+  )
+}
+
+// ─── 推荐进度分阶段动画 ──────────────────────────────────
+// 后端推荐串行：规则筛选 → 粗排 → 检索 → 精排 → 5维评估，约 60-120s
+// 这里按经验时间推进阶段，给用户进度感（不是真实后端进度，但比卡死强）
+const LOADING_STAGES: { label: string; sub: string; atMs: number }[] = [
+  { label: '规则筛选候选学校',  sub: '正在按你的分数 / 选科 / 意向匹配候选库',     atMs: 0 },
+  { label: 'AI 粗排候选',       sub: '从数百所候选中精选 15 所最匹配的学校',       atMs: 8000 },
+  { label: '深度向量检索',       sub: '从知识库提取保研政策 / 培养方案 / 录取数据', atMs: 25000 },
+  { label: 'AI 精排 + 推荐理由', sub: '生成冲 / 稳 / 保分档与个性化推荐文案',     atMs: 35000 },
+  { label: 'AI 五维保研评估',   sub: '逐校分析推免机会 / 竞争 / 升学去向',         atMs: 60000 },
+  { label: '生成完整报告',       sub: '汇总学校详情、政策、个性化建议',           atMs: 90000 },
+]
+
+function LoadingProgress({ statusText }: { statusText: string }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const start = Date.now()
+    const t = setInterval(() => setElapsed(Date.now() - start), 500)
+    return () => clearInterval(t)
+  }, [])
+
+  const currentIdx = (() => {
+    let idx = 0
+    for (let i = 0; i < LOADING_STAGES.length; i++) {
+      if (elapsed >= LOADING_STAGES[i].atMs) idx = i
+    }
+    return idx
+  })()
+
+  const seconds = Math.floor(elapsed / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  const timeStr = minutes > 0 ? `${minutes}分${secs}秒` : `${seconds}秒`
+
+  return (
+    <div className="max-w-md mx-auto px-4 py-6 text-left">
+      {/* 顶部图标 + 当前阶段大字 */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="relative h-12 w-12 flex-shrink-0">
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 opacity-90" />
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-ping opacity-30" />
+          <Loader2 className="absolute inset-0 m-auto h-5 w-5 text-white animate-spin" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-base font-semibold leading-tight">
+            {LOADING_STAGES[currentIdx].label}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {LOADING_STAGES[currentIdx].sub}
+          </p>
+        </div>
+      </div>
+
+      {/* 阶段进度列表 */}
+      <div className="space-y-2 mb-6">
+        {LOADING_STAGES.map((stage, i) => {
+          const done = i < currentIdx
+          const active = i === currentIdx
+          return (
+            <div key={i} className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
+              active && 'bg-indigo-50/60 border border-indigo-100',
+            )}>
+              <div className={cn(
+                'h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all',
+                done   && 'bg-emerald-100',
+                active && 'bg-indigo-100',
+                !done && !active && 'bg-muted',
+              )}>
+                {done ? (
+                  <span className="text-emerald-600 text-xs">✓</span>
+                ) : active ? (
+                  <Loader2 className="h-3 w-3 text-indigo-600 animate-spin" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                )}
+              </div>
+              <span className={cn(
+                'text-xs transition-colors',
+                done   && 'text-foreground/70',
+                active && 'text-foreground font-medium',
+                !done && !active && 'text-muted-foreground/60',
+              )}>
+                {stage.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 底部时长 + 后端真实状态 */}
+      <div className="pt-4 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+        <span>已用 {timeStr}</span>
+        <span className="opacity-70">{statusText}</span>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground/70 mt-4 leading-relaxed text-center">
+        💡 AI 需要 3 轮深度推理生成完整结果，预计 1-2 分钟。请勿关闭页面。
+      </p>
     </div>
   )
 }

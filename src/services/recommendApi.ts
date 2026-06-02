@@ -91,8 +91,10 @@ export async function pollRecommendation(
     onTick?: (s: RecommendationStatus) => void
   } = {},
 ): Promise<RecommendationRecord> {
-  const intervalMs = opts.intervalMs ?? 2500
-  const timeoutMs = opts.timeoutMs ?? 120000
+  // 1.5s 间隔比 2.5s 更快感知到 completed（最多省 1 秒）；
+  // 后端推荐 LLM 串行约需 60-120s，超时 4 分钟兜底
+  const intervalMs = opts.intervalMs ?? 1500
+  const timeoutMs = opts.timeoutMs ?? 240000
   const start = Date.now()
 
   for (;;) {
