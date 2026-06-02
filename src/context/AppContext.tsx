@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { AppContextState, StudentInfo } from '@/types'
 
 const STORAGE_KEY = 'gaokao_student_info'
+const REC_ID_KEY = 'gaokao_recommendation_id'
 
 export const AppContext = createContext<AppContextState | null>(null)
 
@@ -18,10 +19,20 @@ function readStoredInfo(): StudentInfo | null {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [studentInfo, setStudentInfoState] = useState<StudentInfo | null>(readStoredInfo)
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
+  const [recommendationId, setRecommendationIdState] = useState<string | null>(
+    () => localStorage.getItem(REC_ID_KEY),
+  )
 
   function setStudentInfo(info: StudentInfo) {
     setStudentInfoState(info)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(info))
+  }
+
+  /** 保存/清除最近一次推荐任务 ID（供结果页轮询、聊天页追问使用） */
+  function setRecommendationId(id: string | null) {
+    setRecommendationIdState(id)
+    if (id) localStorage.setItem(REC_ID_KEY, id)
+    else localStorage.removeItem(REC_ID_KEY)
   }
 
   function toggleSelectedSchool(id: string) {
@@ -36,7 +47,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ studentInfo, selectedSchools, setStudentInfo, toggleSelectedSchool, clearSelectedSchools }}
+      value={{
+        studentInfo,
+        selectedSchools,
+        recommendationId,
+        setStudentInfo,
+        setRecommendationId,
+        toggleSelectedSchool,
+        clearSelectedSchools,
+      }}
     >
       {children}
     </AppContext.Provider>

@@ -17,7 +17,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAppContext } from '@/hooks/useAppContext'
 import {
   mockStudentInfo,
-  mockKnowledgeSources,
   mockQuickQuestions,
   mockRecommendations,
   initialChatMessages,
@@ -224,8 +223,9 @@ function AssistantMessage({
   const hasActions = (msg.agentData?.nextActions?.length ?? 0) > 0
   const hasExtras = hasCards || hasActions
 
-  // 历史消息默认折叠卡片区，最新消息默认展开
-  const [expanded, setExpanded] = useState(isLatest)
+  // 推荐卡片默认折叠（不论新旧），避免每次对话都把卡片砸到用户脸上；按需展开
+  const [expanded, setExpanded] = useState(false)
+  void isLatest
 
   return (
     <div className="flex gap-3" data-message-id={msg.id}>
@@ -240,19 +240,21 @@ function AssistantMessage({
           {msg.content}
         </div>
 
-        {/* 历史消息：折叠开关 */}
-        {!isLatest && hasExtras && (
+        {/* 折叠开关 —— 所有带推荐/建议的消息都显示 */}
+        {hasExtras && (
           <button
             onClick={() => setExpanded(e => !e)}
             className="self-start text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-muted/50 transition-colors"
           >
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            {expanded ? '收起' : `展开 ${msg.agentData?.recommendations?.length ?? 0} 张推荐卡片 + ${msg.agentData?.nextActions?.length ?? 0} 个建议`}
+            {expanded
+              ? '收起'
+              : `展开 ${msg.agentData?.recommendations?.length ?? 0} 张推荐卡片 + ${msg.agentData?.nextActions?.length ?? 0} 个建议`}
           </button>
         )}
 
-        {/* 推荐院校 + 下一步（最新或展开时显示） */}
-        {(isLatest || expanded) && (
+        {/* 推荐院校 + 下一步（仅展开时显示） */}
+        {expanded && (
           <>
             {hasCards && (
               <div className="space-y-2">
@@ -742,7 +744,7 @@ function saveMessagesToStorage(messages: ChatMessage[]) {
 
 export default function ChatPage() {
   const navigate = useNavigate()
-  const { studentInfo } = useAppContext()
+  const { studentInfo, recommendationId } = useAppContext()
   const info = studentInfo ?? mockStudentInfo
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessagesFromStorage())
@@ -817,7 +819,7 @@ export default function ChatPage() {
     let collectedResponse: AgentResponse | null = null
 
     streamCtrlRef.current = chatWithAgent(
-      { message: text, studentInfo: info, history: messages, mode },
+      { message: text, studentInfo: info, history: messages, mode, recommendationId },
       {
         onStep: (step, index) => {
           setActiveSteps(prev => {
@@ -871,6 +873,13 @@ export default function ChatPage() {
         },
         onError: (err) => {
           console.error('[Agent] Error:', err)
+          const errMsg: ChatMessage = {
+            id: `msg_${Date.now()}`,
+            role: 'assistant',
+            content: `⚠️ ${err.message || '咨询失败，请稍后重试'}`,
+            timestamp: Date.now(),
+          }
+          setMessages(prev => [...prev, errMsg])
           setPhase('idle')
           phaseRef.current = 'idle'
           setActiveSteps([])
@@ -912,6 +921,39 @@ export default function ChatPage() {
   const isLoading = phase !== 'idle'
   const educationGoal = info.educationGoal ?? (info.careAboutPostgrad ? '保研' : '未定')
 
+  // ── 无推荐 id：显示引导，而不是发请求出错（后端聊天接口强依赖 recommendation_id） ──
+  if (!recommendationId) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 md:py-28">
+        <div className="card-surface rounded-3xl p-8 md:p-10 text-center shadow-xl shadow-indigo-100/40">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-200 mb-5">
+            <Sparkles className="h-7 w-7 text-white" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+            先去生成你的志愿推荐吧
+          </h1>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-8 max-w-md mx-auto">
+            AI 顾问需要基于一次「推荐结果」来为你答疑——
+            <br />
+            填写一下高考画像，AI 才能围绕你的候选院校精准作答。
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate('/')} size="lg" className="rounded-full gap-1.5 px-6">
+              去填写画像
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => navigate('/results')} size="lg" variant="outline" className="rounded-full px-6">
+              已生成？查看结果
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground/70 mt-6">
+            🎓 提示：完成一次推荐后，本页会基于该次推荐进入对话
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-4 md:py-6 h-[calc(100vh-56px)] flex flex-col">
       <div className="flex gap-3 md:gap-4 flex-1 min-h-0">
@@ -931,7 +973,7 @@ export default function ChatPage() {
               <Separator />
               <ProfileRow label="分数" value={<span className="font-bold text-primary">{info.score} 分</span>} />
               <Separator />
-              <ProfileRow label="位次" value={info.rank.toLocaleString()} />
+              <ProfileRow label="位次" value={info.rank != null ? info.rank.toLocaleString() : '未填'} />
               <Separator />
               <div>
                 <p className="text-muted-foreground text-xs">选科</p>
@@ -948,10 +990,10 @@ export default function ChatPage() {
               </div>
               <Separator />
               <div>
-                <p className="text-muted-foreground text-xs">目标城市</p>
+                <p className="text-muted-foreground text-xs">目标省份</p>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {info.targetCities.length > 0
-                    ? info.targetCities.map(c => (
+                  {info.targetProvinces.length > 0
+                    ? info.targetProvinces.map(c => (
                         <Badge key={c} variant="outline" className="text-[10px] px-1.5 py-0">{c}</Badge>
                       ))
                     : <span className="text-xs text-muted-foreground">不限</span>
@@ -1108,7 +1150,7 @@ export default function ChatPage() {
 
         {/* ── 右侧：RAG 知识库 + 相关院校 ── */}
         <aside className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 overflow-y-auto">
-          {/* RAG 引用面板 */}
+          {/* RAG 引用面板 —— 展示后端 SSE sources 帧推送的真实命中文件 */}
           <Card className="border-blue-200/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-1.5">
@@ -1118,18 +1160,27 @@ export default function ChatPage() {
               <p className="text-[10px] text-muted-foreground">
                 {lastSources.length > 0
                   ? `本次回答命中 ${lastSources.length} 个来源`
-                  : `共 ${mockKnowledgeSources.length} 个文档已索引`
-                }
+                  : '提问后此处展示 Agent 实际引用的文件'}
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(lastSources.length > 0 ? lastSources : mockKnowledgeSources.slice(0, 4)).map(src => (
-                <SourceCard
-                  key={src.id}
-                  src={src}
-                  active={activeSourceIds.has(src.id)}
-                />
-              ))}
+              {lastSources.length > 0 ? (
+                lastSources.map(src => (
+                  <SourceCard
+                    key={src.id}
+                    src={src}
+                    active={activeSourceIds.has(src.id)}
+                  />
+                ))
+              ) : (
+                <div className="py-6 text-center">
+                  <Library className="h-7 w-7 mx-auto mb-2 text-muted-foreground/30" />
+                  <p className="text-xs text-muted-foreground/80">暂无引用</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1 leading-snug">
+                    向 Agent 提问后，<br />本次对话引用的知识库文件会显示在这里
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

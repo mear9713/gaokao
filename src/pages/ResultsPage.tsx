@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { JSX } from 'react'
 import {
   GitCompare, MessageSquare, FileText, ChevronRight,
   Target, Sparkles, MapPin, Award,
-  Edit3, ArrowRight, Search,
+  Edit3, ArrowRight, Search, Loader2, AlertTriangle, RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,9 +12,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { useAppContext } from '@/hooks/useAppContext'
-import { mockRecommendations, mockStudentInfo } from '@/data/mockData'
+import { mockStudentInfo } from '@/data/mockData'
+import { pollRecommendation, parseResult, type RecStatus } from '@/services/recommendApi'
 import { cn } from '@/lib/utils'
-import type { RecommendCategory, AdmissionRisk } from '@/types'
+import type { RecommendCategory, AdmissionRisk, SchoolRecommendation } from '@/types'
 
 // ─── 视觉常量 ──────────────────────────────────────────────
 const CATEGORY_STYLES: Record<RecommendCategory, { badge: string; ring: string; text: string }> = {
@@ -29,12 +30,24 @@ const RISK_STYLES: Record<AdmissionRisk, { bg: string; dot: string; text: string
   '低': { bg: 'bg-emerald-50', dot: 'bg-emerald-500', text: 'text-emerald-700' },
 }
 
+type LoadState = 'idle' | 'loading' | 'done' | 'failed' | 'empty'
+
+function statusLabel(s: RecStatus): string {
+  switch (s) {
+    case 'pending':    return '任务排队中...'
+    case 'processing': return 'AI 正在分析并匹配院校...'
+    case 'completed':  return '即将完成...'
+    case 'failed':     return '任务失败'
+    default:           return '正在生成推荐...'
+  }
+}
+
 // ─── 匹配度仪表 ──────────────────────────────────────────────
 function MatchGauge({ score }: { score: number }) {
   const colorClass = score >= 90 ? 'text-gradient-blue' : score >= 80 ? 'text-indigo-600' : 'text-gray-400'
   return (
     <div className="inline-flex items-baseline gap-0.5">
-      <span className={cn('text-2xl font-bold font-numeric', colorClass)}>{score}</span>
+      <span className={cn('text-2xl font-bold font-numeric', colorClass)}>{score || '—'}</span>
       <span className="text-xs text-muted-foreground">分</span>
     </div>
   )
@@ -56,24 +69,79 @@ function highlightKeywords(text: string) {
   return result
 }
 
+// ─── 状态容器（加载 / 失败 / 空 / 未生成 复用） ──────────────
+function StatusShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-indigo-600 font-semibold mb-1.5">DECISION DASHBOARD</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">志愿决策看板</h1>
+        </div>
+      </div>
+      <div className="card-surface rounded-2xl py-20 text-center">{children}</div>
+    </div>
+  )
+}
+
 // ─── 主组件 ────────────────────────────────────────────────
 export default function ResultsPage() {
   const navigate = useNavigate()
-  const { studentInfo, selectedSchools, toggleSelectedSchool, clearSelectedSchools } = useAppContext()
+  const { studentInfo, recommendationId, selectedSchools, toggleSelectedSchool, clearSelectedSchools } = useAppContext()
   const info = studentInfo ?? mockStudentInfo
+
+  const [loadState, setLoadState] = useState<LoadState>('idle')
+  const [statusText, setStatusText] = useState('正在生成推荐...')
+  const [recs, setRecs] = useState<SchoolRecommendation[]>([])
+  const [errorMsg, setErrorMsg] = useState('')
+  const [disclaimer, setDisclaimer] = useState('')
 
   const [filter, setFilter] = useState<RecommendCategory | '全部'>('全部')
   const [search, setSearch] = useState('')
 
+  const loadRecommendations = useCallback(async () => {
+    if (!recommendationId) {
+      setLoadState('idle')
+      return
+    }
+    setLoadState('loading')
+    setErrorMsg('')
+    setStatusText('正在生成推荐...')
+    try {
+      const record = await pollRecommendation(recommendationId, {
+        onTick: (s) => setStatusText(statusLabel(s.status)),
+      })
+      if (record.status === 'failed') {
+        setLoadState('failed')
+        setErrorMsg('推荐任务执行失败')
+        return
+      }
+      const parsed = parseResult(record.result)
+      setDisclaimer(parsed.dataDisclaimer)
+      if (parsed.recommendations.length === 0) {
+        setRecs([])
+        setLoadState('empty')
+        return
+      }
+      setRecs(parsed.recommendations)
+      setLoadState('done')
+    } catch (err) {
+      setLoadState('failed')
+      setErrorMsg((err as Error).message || '获取推荐失败')
+    }
+  }, [recommendationId])
+
+  useEffect(() => { loadRecommendations() }, [loadRecommendations])
+
   const stats = useMemo(() => {
-    const chase = mockRecommendations.filter(r => r.category === '冲刺').length
-    const stable = mockRecommendations.filter(r => r.category === '稳妥').length
-    const safe = mockRecommendations.filter(r => r.category === '保底').length
-    return { chase, stable, safe, total: mockRecommendations.length }
-  }, [])
+    const chase = recs.filter(r => r.category === '冲刺').length
+    const stable = recs.filter(r => r.category === '稳妥').length
+    const safe = recs.filter(r => r.category === '保底').length
+    return { chase, stable, safe, total: recs.length }
+  }, [recs])
 
   const filtered = useMemo(() => {
-    return mockRecommendations.filter(r => {
+    return recs.filter(r => {
       if (filter !== '全部' && r.category !== filter) return false
       if (search) {
         const q = search.toLowerCase()
@@ -83,7 +151,12 @@ export default function ResultsPage() {
       }
       return true
     })
-  }, [filter, search])
+  }, [recs, filter, search])
+
+  const strategySummary = useMemo(() => {
+    const rankStr = info.rank != null ? `，位次 ${info.rank.toLocaleString()}` : ''
+    return `你的分数 ${info.score} 分${rankStr}（${info.province}生源）。基于你的【${info.riskPreference}】风险偏好和【${info.careAboutPostgrad ? '重视' : '不重视'}保研】的诉求，系统匹配出 ${stats.total} 所方案：${stats.chase} 所冲刺、${stats.stable} 所稳妥、${stats.safe} 所保底。`
+  }, [info, stats])
 
   function handleAddCompare(id: string, name: string) {
     const isAdding = !selectedSchools.includes(id)
@@ -99,10 +172,70 @@ export default function ResultsPage() {
     navigate('/compare')
   }
 
-  const strategySummary = useMemo(() => {
-    return `你的分数 ${info.score} 分（位次 ${info.rank.toLocaleString()}）在${info.province}处于一本线上区间。基于你的【${info.riskPreference}】风险偏好和【${info.careAboutPostgrad ? '重视' : '不重视'}保研】的诉求，系统从全国候选院校中精选 ${stats.total} 所匹配方案：${stats.chase} 所冲刺、${stats.stable} 所稳妥、${stats.safe} 所保底。`
-  }, [info, stats])
+  // ── 未生成推荐 ──
+  if (loadState === 'idle') {
+    return (
+      <StatusShell>
+        <div className="text-5xl mb-4">📝</div>
+        <p className="text-lg font-medium mb-1">还没有推荐结果</p>
+        <p className="text-sm text-muted-foreground mb-6">请先填写高考信息，生成你的专属志愿方案</p>
+        <Button onClick={() => navigate('/')} className="rounded-full gap-1.5">
+          <Edit3 className="h-4 w-4" /> 去填写信息
+        </Button>
+      </StatusShell>
+    )
+  }
 
+  // ── 加载中（轮询） ──
+  if (loadState === 'loading') {
+    return (
+      <StatusShell>
+        <Loader2 className="h-10 w-10 mx-auto mb-5 text-indigo-500 animate-spin" />
+        <p className="text-lg font-medium mb-1">{statusText}</p>
+        <p className="text-sm text-muted-foreground">AI 正在检索招生 / 保研数据并匹配院校，请稍候…</p>
+      </StatusShell>
+    )
+  }
+
+  // ── 失败 ──
+  if (loadState === 'failed') {
+    return (
+      <StatusShell>
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500 mb-5">
+          <AlertTriangle className="h-7 w-7" />
+        </div>
+        <p className="text-lg font-medium mb-1">推荐生成失败</p>
+        <p className="text-sm text-muted-foreground mb-1">{errorMsg}</p>
+        <p className="text-xs text-muted-foreground/80 mb-6 max-w-md mx-auto">
+          画像已正常提交至后端；当前是后端推荐服务（worker）异常导致任务失败，并非前端问题。可稍后重试或重新填写。
+        </p>
+        <div className="flex gap-2 justify-center">
+          <Button variant="outline" onClick={loadRecommendations} className="rounded-full gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5" /> 重试
+          </Button>
+          <Button onClick={() => navigate('/')} className="rounded-full gap-1.5">
+            <Edit3 className="h-3.5 w-3.5" /> 重新填写
+          </Button>
+        </div>
+      </StatusShell>
+    )
+  }
+
+  // ── 空结果 ──
+  if (loadState === 'empty') {
+    return (
+      <StatusShell>
+        <div className="text-5xl mb-4">🔍</div>
+        <p className="text-lg font-medium mb-1">未匹配到合适的院校</p>
+        <p className="text-sm text-muted-foreground mb-2">{disclaimer || '当前条件下暂无符合的推荐，试试调整分数 / 省份 / 意向专业。'}</p>
+        <Button onClick={() => navigate('/')} className="rounded-full gap-1.5 mt-4">
+          <Edit3 className="h-4 w-4" /> 调整信息重新匹配
+        </Button>
+      </StatusShell>
+    )
+  }
+
+  // ── 正常渲染（done） ──
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 space-y-6">
 
@@ -141,7 +274,7 @@ export default function ResultsPage() {
           <div className="space-y-2.5 text-sm">
             <Row label="所在省份" value={info.province} />
             <Row label="高考分数" value={<span className="font-bold text-foreground font-numeric">{info.score} 分</span>} />
-            <Row label="高考位次" value={<span className="font-numeric">{info.rank.toLocaleString()}</span>} />
+            <Row label="高考位次" value={<span className="font-numeric">{info.rank != null ? info.rank.toLocaleString() : '未填'}</span>} />
             <Row label="选科组合" value={
               <div className="flex flex-wrap gap-1 justify-end">
                 {info.subjects.map(s => <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>)}
@@ -219,6 +352,7 @@ export default function ResultsPage() {
             const isSelected = selectedSchools.includes(rec.id)
             const cs = CATEGORY_STYLES[rec.category]
             const rs = RISK_STYLES[rec.admissionRisk]
+            const hasScore = rec.lastYearScore > 0
             const scoreDiff = info.score - rec.lastYearScore
             return (
               <div
@@ -245,7 +379,7 @@ export default function ResultsPage() {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                       <MapPin className="h-3 w-3" />
-                      {rec.city} · {rec.schoolLevel}
+                      {rec.city || '—'} · {rec.schoolLevel || '—'}
                       <span className="mx-1">·</span>
                       {rec.recommendedMajor}
                     </div>
@@ -268,22 +402,26 @@ export default function ResultsPage() {
                   />
                   <Metric
                     label="往年位次"
-                    value={<span className="font-numeric">{rec.lastYearRank.toLocaleString()}</span>}
+                    value={<span className="font-numeric">{rec.lastYearRank > 0 ? rec.lastYearRank.toLocaleString() : '—'}</span>}
                   />
                   <Metric
                     label="分差"
                     value={
-                      <span className={cn('font-numeric font-medium', scoreDiff >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                        {scoreDiff >= 0 ? '+' : ''}{scoreDiff}
-                      </span>
+                      hasScore ? (
+                        <span className={cn('font-numeric font-medium', scoreDiff >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                          {scoreDiff >= 0 ? '+' : ''}{scoreDiff}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>
                     }
                   />
                 </div>
 
-                <div className="flex items-start gap-2 py-2.5 px-3 bg-purple-50/50 rounded-xl mb-3 border border-purple-100/50">
-                  <Award className="h-3.5 w-3.5 text-purple-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-purple-900 leading-relaxed">{rec.postgradAdvantage}</p>
-                </div>
+                {rec.postgradAdvantage && (
+                  <div className="flex items-start gap-2 py-2.5 px-3 bg-purple-50/50 rounded-xl mb-3 border border-purple-100/50">
+                    <Award className="h-3.5 w-3.5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-purple-900 leading-relaxed">{rec.postgradAdvantage}</p>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2 mb-4">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -347,7 +485,7 @@ export default function ResultsPage() {
       )}
 
       <p className="text-center text-xs text-muted-foreground py-2">
-        📊 数据来源：2024 年录取数据 · 匹配度由 AI 综合评估 · 仅供参考
+        📊 {disclaimer || '数据来源：后端推荐服务 · 匹配度由 AI 综合评估 · 仅供参考'}
       </p>
     </div>
   )

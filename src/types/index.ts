@@ -10,10 +10,14 @@ export type EducationGoal = '直接就业' | '考研' | '保研' | '出国留学
 export interface StudentInfo {
   province: string
   score: number
-  rank: number
+  /** 高考位次（可选，后端 student_rank 字段支持 null） */
+  rank: number | null
   subjects: SubjectType[]
-  targetCities: string[]
+  /** 目标省份（多选，对应后端 target_provinces；替代旧的 targetCities） */
+  targetProvinces: string[]
   majorPreference: string
+  /** 意向专业（精确名称列表，提交给后端 target_majors 做匹配；优先于 majorPreference 文本） */
+  targetMajors?: string[]
   schoolPreference: SchoolPreference
   careAboutPostgrad: boolean
   riskPreference: RiskPreference
@@ -178,13 +182,18 @@ export interface AgentChatRequest {
   history: ChatMessage[]
   /** 推理模式（可选，默认 quick） */
   mode?: AgentMode
+  /** 关联的推荐任务 ID（后端要求基于某次推荐结果追问） */
+  recommendationId?: string | null
 }
 
 // ─── Context 状态 ──────────────────────────────────────────
 export interface AppContextState {
   studentInfo: StudentInfo | null
   selectedSchools: string[]
+  /** 最近一次推荐任务 ID（异步推荐：创建后用于轮询结果、聊天追问） */
+  recommendationId: string | null
   setStudentInfo: (info: StudentInfo) => void
+  setRecommendationId: (id: string | null) => void
   toggleSelectedSchool: (id: string) => void
   clearSelectedSchools: () => void
 }
@@ -208,5 +217,6 @@ export interface AuthContextState {
   isStudent: boolean
   isAuthenticated: boolean
   login: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>
+  register: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>
   logout: () => void
 }

@@ -1,13 +1,15 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Printer, FileText, AlertTriangle, CheckCircle, Target, TrendingUp, BookOpen, ArrowRight } from 'lucide-react'
+import { Printer, FileText, AlertTriangle, CheckCircle, Target, TrendingUp, BookOpen, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Separator } from '@/components/ui/separator'
 import { useAppContext } from '@/hooks/useAppContext'
-import { mockStudentInfo, mockRecommendations } from '@/data/mockData'
-import type { RecommendCategory } from '@/types'
+import { mockStudentInfo } from '@/data/mockData'
+import { getRecommendation, parseResult } from '@/services/recommendApi'
+import type { RecommendCategory, SchoolRecommendation } from '@/types'
 
 function SectionTitle({ icon, title, number }: { icon: React.ReactNode; title: string; number: number }) {
   return (
@@ -34,12 +36,48 @@ function CategoryBadge({ cat }: { cat: RecommendCategory }) {
 
 export default function ReportPage() {
   const navigate = useNavigate()
-  const { studentInfo } = useAppContext()
+  const { studentInfo, recommendationId } = useAppContext()
   const info = studentInfo ?? mockStudentInfo
+  const [recs, setRecs] = useState<SchoolRecommendation[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const reachSchools = mockRecommendations.filter(r => r.category === '冲刺')
-  const matchSchools = mockRecommendations.filter(r => r.category === '稳妥')
-  const safeSchools = mockRecommendations.filter(r => r.category === '保底')
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!recommendationId) { setLoading(false); return }
+      try {
+        const record = await getRecommendation(recommendationId)
+        if (!cancelled) { setRecs(parseResult(record.result).recommendations); setLoading(false) }
+      } catch {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [recommendationId])
+
+  const reachSchools = recs.filter(r => r.category === '冲刺')
+  const matchSchools = recs.filter(r => r.category === '稳妥')
+  const safeSchools = recs.filter(r => r.category === '保底')
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-32 text-center">
+        <Loader2 className="h-10 w-10 mx-auto mb-5 text-primary animate-spin" />
+        <p className="text-muted-foreground">正在生成报告…</p>
+      </div>
+    )
+  }
+
+  if (recs.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-32 text-center">
+        <div className="text-5xl mb-4">📋</div>
+        <p className="text-lg font-medium mb-1">还没有可生成报告的推荐数据</p>
+        <p className="text-sm text-muted-foreground mb-6">请先在首页填写信息并生成志愿推荐</p>
+        <Button onClick={() => navigate('/')} className="rounded-full">去填写信息</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -79,9 +117,9 @@ export default function ReportPage() {
               {[
                 { label: '所在省份', value: info.province },
                 { label: '高考分数', value: `${info.score} 分`, highlight: true },
-                { label: '高考位次', value: info.rank.toLocaleString() + ' 名', highlight: true },
+                { label: '高考位次', value: info.rank != null ? info.rank.toLocaleString() + ' 名' : '未填', highlight: true },
                 { label: '选科类型', value: info.subjects.join('/') },
-                { label: '目标城市', value: info.targetCities.length ? info.targetCities.join('、') : '不限' },
+                { label: '目标省份', value: info.targetProvinces.length ? info.targetProvinces.join('、') : '不限' },
                 { label: '专业偏好', value: info.majorPreference || '不限' },
                 { label: '院校层次', value: info.schoolPreference },
                 { label: '是否保研', value: info.careAboutPostgrad ? '✅ 重视保研' : '否' },
@@ -115,7 +153,7 @@ export default function ReportPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockRecommendations.map((r, i) => (
+                  {recs.map((r, i) => (
                     <TableRow key={r.id}>
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-semibold">{r.schoolName}</TableCell>

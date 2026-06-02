@@ -1,16 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   GitCompare, ArrowLeft, Trophy, ChevronRight,
-  MapPin, AlertTriangle,
+  MapPin, AlertTriangle, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
 import { useAppContext } from '@/hooks/useAppContext'
-import { mockSchoolDetails, mockRecommendations } from '@/data/mockData'
+import { getRecommendation, parseResult } from '@/services/recommendApi'
 import { cn } from '@/lib/utils'
-import type { RecommendCategory } from '@/types'
+import type { RecommendCategory, SchoolRecommendation, SchoolDetail } from '@/types'
 
 const COMPARE_METRICS = [
   { key: 'schoolLevel',        label: '院校层次',     emphasize: false },
@@ -36,9 +36,14 @@ const CATEGORY_BADGE: Record<RecommendCategory, string> = {
   '保底': 'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-function getMetricValue(schoolId: string, key: MetricKey): React.ReactNode {
-  const detail = mockSchoolDetails.find(s => s.id === schoolId)
-  const rec = mockRecommendations.find(r => r.id === schoolId)
+function getMetricValue(
+  schoolId: string,
+  key: MetricKey,
+  recs: SchoolRecommendation[],
+  details: SchoolDetail[],
+): React.ReactNode {
+  const detail = details.find(s => s.id === schoolId)
+  const rec = recs.find(r => r.id === schoolId)
   if (!detail && !rec) return <span className="text-muted-foreground">—</span>
 
   switch (key) {
@@ -47,8 +52,8 @@ function getMetricValue(schoolId: string, key: MetricKey): React.ReactNode {
     case 'majorName': return detail?.majorDetail.name ?? rec?.recommendedMajor
     case 'matchScore':
       return rec ? <span className="text-lg font-bold text-gradient-blue font-numeric">{rec.matchScore}</span> : '—'
-    case 'lastYearScore': return rec ? <span className="font-numeric">{rec.lastYearScore} 分</span> : '—'
-    case 'lastYearRank':  return rec ? <span className="font-numeric">{rec.lastYearRank.toLocaleString()}</span> : '—'
+    case 'lastYearScore': return rec && rec.lastYearScore > 0 ? <span className="font-numeric">{rec.lastYearScore} 分</span> : '—'
+    case 'lastYearRank':  return rec && rec.lastYearRank > 0 ? <span className="font-numeric">{rec.lastYearRank.toLocaleString()}</span> : '—'
     case 'admissionRisk':
       if (!rec) return '—'
       const riskColor = rec.admissionRisk === '高' ? 'text-red-600' : rec.admissionRisk === '中' ? 'text-amber-600' : 'text-emerald-600'
@@ -81,15 +86,17 @@ function getMetricValue(schoolId: string, key: MetricKey): React.ReactNode {
 }
 
 // 综合评分算法：匹配度 + 保研竞争力 + 录取风险
-// 优先用详情库里精确的专业保研率，没有则从 postgradAdvantage 字符串提取（保证所有学校公平比较）
-function pickBestSchool(ids: string[]) {
+function pickBestSchool(
+  ids: string[],
+  recs: SchoolRecommendation[],
+  details: SchoolDetail[],
+) {
   const scored = ids.map(id => {
-    const rec = mockRecommendations.find(r => r.id === id)
-    const detail = mockSchoolDetails.find(s => s.id === id)
+    const rec = recs.find(r => r.id === id)
+    const detail = details.find(s => s.id === id)
     if (!rec) return { id, score: 0, name: id, category: undefined, postgradRate: 0 }
 
     const matchScore = rec.matchScore
-    // 优先精确专业保研率，否则从 "保研率 22%" 文本中正则提取
     const postgradRate =
       detail?.majorDetail.majorPostgradRate
       ?? parseInt(rec.postgradAdvantage.match(/(\d+)\s*%/)?.[1] ?? '8', 10)
@@ -104,18 +111,47 @@ function pickBestSchool(ids: string[]) {
 
 export default function ComparePage() {
   const navigate = useNavigate()
-  const { selectedSchools, clearSelectedSchools, toggleSelectedSchool } = useAppContext()
+  const { selectedSchools, clearSelectedSchools, toggleSelectedSchool, recommendationId } = useAppContext()
+
+  const [recs, setRecs] = useState<SchoolRecommendation[]>([])
+  const [details, setDetails] = useState<SchoolDetail[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!recommendationId) { setLoading(false); return }
+      try {
+        const record = await getRecommendation(recommendationId)
+        const parsed = parseResult(record.result)
+        if (!cancelled) { setRecs(parsed.recommendations); setDetails(parsed.schoolDetails); setLoading(false) }
+      } catch {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [recommendationId])
 
   const schools = selectedSchools.map(id => {
-    const detail = mockSchoolDetails.find(s => s.id === id)
-    const rec = mockRecommendations.find(r => r.id === id)
+    const detail = details.find(s => s.id === id)
+    const rec = recs.find(r => r.id === id)
     return { id, name: detail?.schoolName ?? rec?.schoolName ?? id }
   })
 
-  const ranking = useMemo(() => pickBestSchool(selectedSchools), [selectedSchools])
+  const ranking = useMemo(() => pickBestSchool(selectedSchools, recs, details), [selectedSchools, recs, details])
   const best = ranking[0]
 
-  // 空状态
+  // 加载中
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-32 text-center">
+        <Loader2 className="h-10 w-10 mx-auto mb-5 text-indigo-500 animate-spin" />
+        <p className="text-muted-foreground">正在加载对比数据…</p>
+      </div>
+    )
+  }
+
+  // 空状态（未选择院校）
   if (schools.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
@@ -219,7 +255,7 @@ export default function ComparePage() {
                   <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">对比维度</p>
                 </th>
                 {schools.map(s => {
-                  const rec = mockRecommendations.find(r => r.id === s.id)
+                  const rec = recs.find(r => r.id === s.id)
                   const isBest = best && s.id === best.id
                   return (
                     <th key={s.id} className={cn(
@@ -236,7 +272,7 @@ export default function ComparePage() {
                         {rec && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
-                            {rec.city}
+                            {rec.city || '—'}
                           </p>
                         )}
                         <div className="flex gap-1 mt-1">
@@ -287,7 +323,7 @@ export default function ComparePage() {
                         'px-5 py-3.5 text-center text-sm border-l border-border/40',
                         isBest && 'bg-amber-50/20'
                       )}>
-                        {getMetricValue(s.id, metric.key)}
+                        {getMetricValue(s.id, metric.key, recs, details)}
                       </td>
                     )
                   })}
@@ -305,7 +341,7 @@ export default function ComparePage() {
           <div className="space-y-1.5">
             <p className="text-sm font-semibold text-amber-900">填报风险提示</p>
             <p className="text-xs text-amber-800/80 leading-relaxed">
-              对比表数据基于 2024 年录取情况。实际填报时务必关注：
+              对比表数据基于后端推荐结果。实际填报时务必关注：
               ① 当年招生计划变化 ② 选科要求是否匹配 ③ 部分专业有体检/单科限制 ④ "服从调剂"对低分录取的影响。
               建议结合<span className="font-medium underline cursor-pointer" onClick={() => navigate('/chat')}>AI 咨询</span>进行进一步分析。
             </p>
@@ -314,7 +350,7 @@ export default function ComparePage() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground py-2">
-        💡 数据来源：2024 年各院校官网及招生简章 · 仅供参考
+        💡 数据来源：后端推荐服务 · 仅供参考
       </p>
     </div>
   )

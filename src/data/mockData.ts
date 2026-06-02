@@ -11,12 +11,13 @@ import type {
 
 // ─── 默认学生信息 ──────────────────────────────────────────
 export const mockStudentInfo: StudentInfo = {
-  province: '湖南',
+  province: '黑龙江',
   score: 568,
   rank: 15000,
   subjects: ['物理', '化学', '生物'],
-  targetCities: ['武汉', '长沙', '成都'],
-  majorPreference: '计算机/电子信息',
+  targetProvinces: ['黑龙江'],
+  majorPreference: '计算机科学与技术',
+  targetMajors: ['计算机科学与技术'],
   schoolPreference: '211',
   careAboutPostgrad: true,
   riskPreference: '稳妥',
@@ -840,7 +841,7 @@ export const initialChatMessages: ChatMessage[] = [
     id: 'init_001',
     role: 'assistant',
     content:
-      '你好！我是高考志愿填报 AI Agent 🎓\n\n我已经看到你的基本情况：**湖南省，568分，位次约15000，物化生选科，重视保研**。\n\n我会基于 **RAG 知识库**（含 8 类共 200+ 份招生/保研/培养方案数据）为你提供个性化建议。\n\n请直接提问，或点击下方快捷问题开始！',
+      '你好！我是高考志愿填报 AI Agent 🎓\n\n我会基于左侧你的画像，结合 RAG 知识库里的招生/保研/培养方案数据为你提供个性化建议。\n\n请直接提问，或点击下方快捷问题开始！',
     timestamp: Date.now() - 60000,
   },
 ]
@@ -961,10 +962,10 @@ function getAnswerForScenario(scenario: Scenario, info: StudentInfo): string {
 // ─── 各场景的 Agent 执行步骤详情（生成动态 detail） ────────
 function getStepDetails(scenario: Scenario, info: StudentInfo): Record<string, string> {
   const subjectStr = info.subjects.join('/')
-  const cityStr = info.targetCities.length > 0 ? info.targetCities.join('/') : '不限'
+  const cityStr = info.targetProvinces.length > 0 ? info.targetProvinces.join('/') : '不限'
 
   const common: Record<string, string> = {
-    profile:  `识别画像：${info.province} ${info.score}分 位次${info.rank.toLocaleString()} | 选科${subjectStr} | 目标城市${cityStr}`,
+    profile:  `识别画像：${info.province} ${info.score}分${info.rank != null ? ' 位次' + info.rank.toLocaleString() : ''} | 选科${subjectStr} | 目标省份${cityStr}`,
     plan:     `已检索：8 所 985/211 院校在${info.province}的招生计划，覆盖${subjectStr}组合`,
     policy:   `已加载：${info.careAboutPostgrad ? '8' : '3'} 份保研政策文件（重点：电子科大、西安交大、中南）`,
     match:    `已运行匹配算法：基于位次差值 + 风险偏好(${info.riskPreference}) 筛出 4-5 所适配院校`,
@@ -983,7 +984,7 @@ function getStepDetails(scenario: Scenario, info: StudentInfo): Record<string, s
     case 'risk':
       return {
         ...common,
-        plan:  `已查询：2024 年${info.province}省 12 份招生计划，匹配位次区间 [${info.rank - 3000}, ${info.rank + 3000}]`,
+        plan:  `已查询：2024 年${info.province}省 12 份招生计划${info.rank != null ? `，匹配位次区间 [${info.rank - 3000}, ${info.rank + 3000}]` : ''}`,
         match: `已计算分差：与目标院校录取线分差 -22 ~ +20 分，覆盖冲刺/稳妥/保底`,
       }
     case 'major':

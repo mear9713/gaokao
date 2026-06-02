@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Sparkles, User, Lock, Eye, EyeOff, Loader2, ArrowRight,
-  ShieldCheck, GraduationCap, Info,
+  Sparkles, User, Lock, Eye, EyeOff, Loader2, ArrowRight, Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,49 +10,32 @@ import { toast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
-interface QuickAccount {
-  username: string
-  password: string
-  displayName: string
-  role: '管理员' | '学生'
-  description: string
-}
+type Mode = 'login' | 'register'
 
-const QUICK_ACCOUNTS: QuickAccount[] = [
-  {
-    username: 'admin',
-    password: 'admin123',
-    displayName: '管理员',
-    role: '管理员',
-    description: '可访问知识库管理后台、查看运营数据',
-  },
-  {
-    username: 'student',
-    password: '123456',
-    displayName: '同学小张',
-    role: '学生',
-    description: '可使用全部志愿填报功能',
-  },
-]
+// 联调测试账号（后端已注册），方便快速登录验证
+const TEST_ACCOUNT = { username: 'lian_test', password: 'Test123456' }
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, isAuthenticated, user } = useAuth()
+  const { login, register, isAuthenticated, user } = useAuth()
 
   // 登录后回到原来想去的页面（被 RequireAuth 拦截时记录了 from）
   const from = (location.state as { from?: string } | null)?.from || '/'
 
+  const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // 已登录直接跳走
-  if (isAuthenticated && user) {
-    setTimeout(() => navigate(user.role === 'admin' ? '/admin/kb' : from, { replace: true }), 0)
-  }
+  // 已登录 → 跳转（管理员去后台，其余回原页）
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(user.role === 'admin' ? '/admin/kb' : from, { replace: true })
+    }
+  }, [isAuthenticated, user, from, navigate])
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
@@ -61,27 +43,31 @@ export default function LoginPage() {
       setError('请填写完整的账号和密码')
       return
     }
+    if (mode === 'register' && password.length < 8) {
+      setError('密码至少 8 位')
+      return
+    }
     setSubmitting(true)
     setError('')
 
-    const result = await login(username, password)
+    const result = mode === 'login'
+      ? await login(username, password)
+      : await register(username, password)
     setSubmitting(false)
 
     if (result.ok) {
-      const account = QUICK_ACCOUNTS.find(a => a.username === username)
-      toast.success(`欢迎回来，${account?.displayName ?? username}`, '正在跳转...')
-      setTimeout(() => {
-        navigate(account?.role === '管理员' ? '/admin/kb' : from, { replace: true })
-      }, 500)
+      toast.success(mode === 'login' ? '登录成功' : '注册成功', '正在跳转...')
+      // 跳转交给上面的 useEffect（user 更新后触发）
     } else {
-      setError(result.message ?? '登录失败')
-      toast.error('登录失败', result.message)
+      setError(result.message ?? (mode === 'login' ? '登录失败' : '注册失败'))
+      toast.error(mode === 'login' ? '登录失败' : '注册失败', result.message)
     }
   }
 
-  function fillAccount(acc: QuickAccount) {
-    setUsername(acc.username)
-    setPassword(acc.password)
+  function fillTestAccount() {
+    setMode('login')
+    setUsername(TEST_ACCOUNT.username)
+    setPassword(TEST_ACCOUNT.password)
     setError('')
   }
 
@@ -103,11 +89,30 @@ export default function LoginPage() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             欢迎使用 AI 志愿系统
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">登录账户继续</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {mode === 'login' ? '登录账户继续' : '注册一个新账户'}
+          </p>
         </div>
 
         {/* 登录卡 */}
         <div className="card-surface rounded-3xl p-6 md:p-8 shadow-xl shadow-indigo-100/40 animate-fade-in-up" style={{ animationDelay: '60ms' }}>
+          {/* 登录 / 注册 切换 */}
+          <div className="flex gap-1 p-1 mb-5 rounded-xl bg-muted">
+            {(['login', 'register'] as Mode[]).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => { setMode(m); setError('') }}
+                className={cn(
+                  'flex-1 py-2 rounded-lg text-sm font-medium transition-all',
+                  mode === m ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {m === 'login' ? '登录' : '注册'}
+              </button>
+            ))}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 账号 */}
             <div className="space-y-1.5">
@@ -117,7 +122,7 @@ export default function LoginPage() {
                 <Input
                   id="username"
                   type="text"
-                  placeholder="请输入账号"
+                  placeholder={mode === 'register' ? '字母 / 数字 / 下划线，3-50 位' : '请输入账号'}
                   className="pl-9 h-11"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
@@ -135,12 +140,12 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="请输入密码"
+                  placeholder={mode === 'register' ? '至少 8 位' : '请输入密码'}
                   className="pl-9 pr-9 h-11"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   disabled={submitting}
-                  autoComplete="current-password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 />
                 <button
                   type="button"
@@ -159,7 +164,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* 登录按钮 */}
+            {/* 提交按钮 */}
             <Button
               type="submit"
               disabled={submitting || !username || !password}
@@ -168,75 +173,47 @@ export default function LoginPage() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  正在登录...
+                  {mode === 'login' ? '正在登录...' : '正在注册...'}
                 </>
               ) : (
                 <>
-                  登录
+                  {mode === 'login' ? '登录' : '注册并登录'}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </Button>
           </form>
 
-          {/* 快速登录区 */}
+          {/* 联调测试账号 */}
           <div className="mt-6 pt-6 border-t border-border/50">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
               <Info className="h-3.5 w-3.5" />
-              <span>演示账号（点击一键填入）</span>
+              <span>联调测试账号（点击一键填入）</span>
             </div>
-            <div className="space-y-2">
-              {QUICK_ACCOUNTS.map(acc => {
-                const isAdmin = acc.role === '管理员'
-                return (
-                  <button
-                    key={acc.username}
-                    type="button"
-                    onClick={() => fillAccount(acc)}
-                    disabled={submitting}
-                    className={cn(
-                      'w-full text-left p-3 rounded-xl border transition-all hover:shadow-sm group',
-                      isAdmin
-                        ? 'border-purple-100 bg-purple-50/40 hover:border-purple-300 hover:bg-purple-50'
-                        : 'border-indigo-100 bg-indigo-50/40 hover:border-indigo-300 hover:bg-indigo-50',
-                      'disabled:opacity-50'
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className={cn(
-                        'h-7 w-7 rounded-lg flex items-center justify-center',
-                        isAdmin ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'
-                      )}>
-                        {isAdmin ? <ShieldCheck className="h-3.5 w-3.5" /> : <GraduationCap className="h-3.5 w-3.5" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold">
-                          {acc.displayName}
-                          <span className={cn(
-                            'ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full',
-                            isAdmin ? 'bg-purple-200 text-purple-700' : 'bg-indigo-200 text-indigo-700'
-                          )}>
-                            {acc.role}
-                          </span>
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground group-hover:text-foreground">点击填入 →</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-1.5">{acc.description}</p>
-                    <div className="text-[10px] text-muted-foreground font-mono">
-                      {acc.username} · {acc.password}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            <button
+              type="button"
+              onClick={fillTestAccount}
+              disabled={submitting}
+              className="w-full text-left p-3 rounded-xl border border-indigo-100 bg-indigo-50/40 hover:border-indigo-300 hover:bg-indigo-50 transition-all disabled:opacity-50"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">学生测试账号</span>
+                <span className="text-[10px] text-muted-foreground">点击填入 →</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground font-mono mt-1">
+                {TEST_ACCOUNT.username} · {TEST_ACCOUNT.password}
+              </div>
+            </button>
+            <p className="text-[10px] text-muted-foreground/70 mt-3">
+              注册仅支持学生角色；管理员账号需由后端创建。
+            </p>
           </div>
         </div>
 
         {/* 底部 */}
-        <div className="text-center mt-6 space-y-1 animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+        <div className="text-center mt-6 animate-fade-in-up" style={{ animationDelay: '120ms' }}>
           <p className="text-[10px] text-muted-foreground/70">
-            🔒 当前为前端演示版，账号信息仅本地存储
+            🔒 登录信息由后端校验，Token 本地存储
           </p>
         </div>
       </div>

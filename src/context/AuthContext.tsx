@@ -1,31 +1,13 @@
 /**
  * Auth Context · 用户认证状态管理
  *
- * 当前为 Mock 实现（前端写死账号）。真实后端就绪时只需替换 login() 内部：
- *
- * ```typescript
- * const res = await fetch('/api/auth/login', {
- *   method: 'POST',
- *   body: JSON.stringify({ username, password })
- * })
- * const { token, user } = await res.json()
- * ```
- *
- * UI 层完全不需要改动。
+ * 真实后端认证：登录调用 POST /api/v1/auth/login 获取 JWT，
+ * 再调用 GET /api/v1/auth/me 拿用户信息；token 与用户信息存 localStorage。
+ * UI 层通过 useAuth() 消费，签名保持 { ok, message } 不变。
  */
 import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import type { AuthUser, AuthContextState, UserRole } from '@/types'
-
-// ─── Mock 账号库（真实接入时由后端校验） ──────────────────
-const MOCK_ACCOUNTS: Array<{
-  username: string
-  password: string
-  displayName: string
-  role: UserRole
-}> = [
-  { username: 'admin',   password: 'admin123', displayName: '管理员',   role: 'admin' },
-  { username: 'student', password: '123456',   displayName: '同学小张', role: 'student' },
-]
+import type { AuthUser, AuthContextState } from '@/types'
+import { loginApi, registerApi } from '@/services/authApi'
 
 const STORAGE_KEY = 'gaokao_auth_user'
 
@@ -60,28 +42,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (username: string, password: string): Promise<{ ok: boolean; message?: string }> => {
-      // 模拟 600ms 网络延迟（让 UI 有 loading 体验）
-      await new Promise(r => setTimeout(r, 600))
-
-      const account = MOCK_ACCOUNTS.find(
-        a => a.username === username.trim() && a.password === password
-      )
-
-      if (!account) {
-        return { ok: false, message: '账号或密码错误' }
+      try {
+        const r = await loginApi(username.trim(), password)
+        setUser({
+          username: r.username,
+          displayName: r.displayName,
+          role: r.role,
+          token: r.token,
+          loggedInAt: Date.now(),
+        })
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, message: (err as Error).message || '账号或密码错误' }
       }
-
-      const newUser: AuthUser = {
-        username: account.username,
-        displayName: account.displayName,
-        role: account.role,
-        token: `mock_token_${account.username}_${Date.now()}`,
-        loggedInAt: Date.now(),
-      }
-      setUser(newUser)
-      return { ok: true }
     },
-    []
+    [],
+  )
+
+  const register = useCallback(
+    async (username: string, password: string): Promise<{ ok: boolean; message?: string }> => {
+      try {
+        await registerApi(username.trim(), password)
+        // 注册成功后自动登录
+        return await login(username, password)
+      } catch (err) {
+        return { ok: false, message: (err as Error).message || '注册失败' }
+      }
+    },
+    [login],
   )
 
   const logout = useCallback(() => {
@@ -94,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: user?.role === 'admin',
     isStudent: user?.role === 'student',
     login,
+    register,
     logout,
   }
 

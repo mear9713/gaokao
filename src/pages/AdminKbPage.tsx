@@ -1,82 +1,114 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
-  Database, Search, Plus, Trash2, Eye, FileText, Filter,
-  X, Calendar, Building2, Upload, BarChart3, ShieldCheck,
-  LayoutDashboard, ArrowUpRight,
+  Database, Search, Plus, Trash2, Filter,
+  X, Building2, Upload, BarChart3, ShieldCheck,
+  LayoutDashboard, ArrowUpRight, Loader2, RefreshCw,
+  CheckCircle2, Clock, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast'
-import { mockKnowledgeSources } from '@/data/mockData'
+import {
+  listFiles, deleteFile, uploadFile,
+  listSchools, listMajors,
+  DOCUMENT_TYPES,
+  type FileItem, type DocumentType, type VectorStatus,
+  type School, type Major,
+} from '@/services/adminApi'
 import { cn } from '@/lib/utils'
-import type { KnowledgeSource, KnowledgeSourceType } from '@/types'
 
-// 8 类来源的视觉样式
-const TYPE_COLOR: Record<KnowledgeSourceType, { bg: string; text: string; border: string; iconBg: string }> = {
-  '招生数据':   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   iconBg: 'bg-blue-100' },
-  '录取数据':   { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', iconBg: 'bg-indigo-100' },
-  '保研政策':   { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', iconBg: 'bg-purple-100' },
-  '专业信息':   { bg: 'bg-emerald-50',text: 'text-emerald-700',border: 'border-emerald-200',iconBg: 'bg-emerald-100' },
-  '培养方案':   { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   iconBg: 'bg-teal-100' },
-  '奖学金政策': { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  iconBg: 'bg-amber-100' },
-  '转专业政策': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', iconBg: 'bg-orange-100' },
-  '院校官网':   { bg: 'bg-slate-50',  text: 'text-slate-700',  border: 'border-slate-200',  iconBg: 'bg-slate-100' },
+// 5 类文档的视觉样式（与后端 DocumentType 严格一致）
+const TYPE_COLOR: Record<DocumentType, { bg: string; text: string; border: string; iconBg: string }> = {
+  '保研政策':     { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200',  iconBg: 'bg-purple-100' },
+  '转专业政策':   { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  iconBg: 'bg-orange-100' },
+  '奖学金政策':   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   iconBg: 'bg-amber-100' },
+  '历年保研去向': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', iconBg: 'bg-emerald-100' },
+  '历年就业去向': { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    iconBg: 'bg-teal-100' },
 }
 
-const ALL_TYPES: KnowledgeSourceType[] = [
-  '招生数据', '录取数据', '保研政策', '专业信息',
-  '培养方案', '奖学金政策', '转专业政策', '院校官网',
-]
+const VECTOR_STATUS_STYLE: Record<VectorStatus, { label: string; icon: typeof CheckCircle2; cls: string }> = {
+  pending:    { label: '排队中',   icon: Clock,          cls: 'text-amber-600  bg-amber-50  border-amber-200' },
+  processing: { label: '处理中',   icon: Loader2,        cls: 'text-blue-600   bg-blue-50   border-blue-200' },
+  completed:  { label: '已完成',   icon: CheckCircle2,   cls: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  failed:     { label: '失败',     icon: AlertTriangle,  cls: 'text-red-600    bg-red-50    border-red-200' },
+}
 
-// 假数据：扩展显示给运营看的"全库统计"（真实接入时由后端返回）
-const TOTAL_DOC_COUNT = 247
-const TOTAL_CHUNK_COUNT = 18642
-const LAST_INDEXED_AT = '2026-05-28 14:32'
+const PAGE_LIMIT = 50
 
 export default function AdminKbPage() {
-  const [docs, setDocs] = useState<KnowledgeSource[]>(mockKnowledgeSources)
-  const [typeFilter, setTypeFilter] = useState<KnowledgeSourceType | '全部'>('全部')
+  const [docs, setDocs] = useState<FileItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const [typeFilter, setTypeFilter] = useState<DocumentType | '全部'>('全部')
   const [search, setSearch] = useState('')
-  const [viewingDoc, setViewingDoc] = useState<KnowledgeSource | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
-  // 各类统计
+  const loadList = useCallback(async () => {
+    setLoading(true)
+    setErrorMsg('')
+    try {
+      const resp = await listFiles({ skip: 0, limit: PAGE_LIMIT })
+      setDocs(resp.items)
+      setTotal(resp.total)
+    } catch (err) {
+      setErrorMsg((err as Error).message || '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadList() }, [loadList])
+
+  // 各类型数量统计（按当前页内文档）
   const typeStats = useMemo(() => {
-    const stats: Record<KnowledgeSourceType, number> = {} as Record<KnowledgeSourceType, number>
-    ALL_TYPES.forEach(t => stats[t] = 0)
-    docs.forEach(d => stats[d.type] = (stats[d.type] || 0) + 1)
+    const stats: Record<DocumentType, number> = {} as Record<DocumentType, number>
+    DOCUMENT_TYPES.forEach(t => stats[t] = 0)
+    docs.forEach(d => stats[d.document_type] = (stats[d.document_type] || 0) + 1)
     return stats
   }, [docs])
 
-  // 过滤+搜索
+  // 各向量化状态分布
+  const vectorStats = useMemo(() => {
+    const s: Record<VectorStatus, number> = { pending: 0, processing: 0, completed: 0, failed: 0 }
+    docs.forEach(d => s[d.vector_status] += 1)
+    return s
+  }, [docs])
+
+  // 客户端过滤 + 搜索（后端只支持 school_id / major_id 过滤，类型 / 关键字在前端做）
   const filtered = useMemo(() => {
     return docs.filter(d => {
-      if (typeFilter !== '全部' && d.type !== typeFilter) return false
+      if (typeFilter !== '全部' && d.document_type !== typeFilter) return false
       if (search) {
         const q = search.toLowerCase()
-        if (!d.title.toLowerCase().includes(q) &&
-            !d.source.toLowerCase().includes(q) &&
-            !(d.schoolName?.toLowerCase() || '').includes(q)) return false
+        if (!d.file_name.toLowerCase().includes(q) &&
+            !(d.document_title?.toLowerCase() ?? '').includes(q)) return false
       }
       return true
     })
   }, [docs, typeFilter, search])
 
-  function handleDelete(doc: KnowledgeSource) {
-    if (!confirm(`确认删除「${doc.title}」？\n该操作不可恢复，且会同时移除向量库中的所有切片。`)) return
-    setDocs(prev => prev.filter(d => d.id !== doc.id))
-    toast.success('已删除', doc.title)
+  async function handleDelete(doc: FileItem) {
+    if (!confirm(`确认删除「${doc.document_title || doc.file_name}」？\n该操作不可恢复，且会同时移除向量库中的所有切片。`)) return
+    try {
+      await deleteFile(doc.id)
+      setDocs(prev => prev.filter(d => d.id !== doc.id))
+      setTotal(t => Math.max(0, t - 1))
+      toast.success('已删除', doc.file_name)
+    } catch (err) {
+      toast.error('删除失败', (err as Error).message)
+    }
   }
 
-  function handleCreate(newDoc: Omit<KnowledgeSource, 'id'>) {
-    const doc: KnowledgeSource = {
-      ...newDoc,
-      id: `ks_${Date.now()}`,
-    }
-    setDocs(prev => [doc, ...prev])
-    toast.success('已新增文档', doc.title)
+  function handleCreated(newDoc: FileItem) {
+    setDocs(prev => [newDoc, ...prev])
+    setTotal(t => t + 1)
     setShowCreate(false)
+    toast.success('已上传', newDoc.file_name)
   }
 
   return (
@@ -94,59 +126,51 @@ export default function AdminKbPage() {
           </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">RAG 知识库管理</h1>
           <p className="text-sm text-muted-foreground mt-1.5">
-            管理 Agent 用于检索的所有文档·支持新增·编辑·删除·向量重建
+            管理 Agent 用于检索的文档·后端 `/api/admin/kb` 实时同步
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)} className="rounded-full gap-1.5 self-start md:self-auto">
-          <Plus className="h-4 w-4" />
-          上传新文档
-        </Button>
+        <div className="flex gap-2 self-start md:self-auto">
+          <Button variant="outline" onClick={loadList} disabled={loading} className="rounded-full gap-1.5">
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+            刷新
+          </Button>
+          <Button onClick={() => setShowCreate(true)} className="rounded-full gap-1.5">
+            <Plus className="h-4 w-4" />
+            上传新文档
+          </Button>
+        </div>
       </div>
+
+      {/* 错误条 */}
+      {errorMsg && (
+        <div className="card-surface rounded-2xl p-4 border-red-200 bg-red-50/40">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-red-900">加载失败</p>
+              <p className="text-xs text-red-700 mt-0.5">{errorMsg}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={loadList} className="rounded-full">重试</Button>
+          </div>
+        </div>
+      )}
 
       {/* 全局统计卡 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          icon={Database}
-          label="总文档数"
-          value={TOTAL_DOC_COUNT}
-          hint={`本页显示 ${docs.length} 个`}
-          color="text-indigo-600"
-          bg="bg-indigo-50"
-        />
-        <StatCard
-          icon={FileText}
-          label="向量切片数"
-          value={TOTAL_CHUNK_COUNT.toLocaleString()}
-          hint="每文档 ~75 切片"
-          color="text-purple-600"
-          bg="bg-purple-50"
-        />
-        <StatCard
-          icon={LayoutDashboard}
-          label="覆盖类型"
-          value={ALL_TYPES.length}
-          hint="8 类知识源"
-          color="text-emerald-600"
-          bg="bg-emerald-50"
-        />
-        <StatCard
-          icon={Calendar}
-          label="最近索引"
-          value={LAST_INDEXED_AT.split(' ')[1]}
-          hint={LAST_INDEXED_AT.split(' ')[0]}
-          color="text-amber-600"
-          bg="bg-amber-50"
-        />
+        <StatCard icon={Database} label="总文档数" value={total} hint={`本页 ${docs.length} 条`} color="text-indigo-600" bg="bg-indigo-50" />
+        <StatCard icon={LayoutDashboard} label="覆盖类型" value={DOCUMENT_TYPES.length} hint="5 类知识源" color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={CheckCircle2} label="已完成切片" value={vectorStats.completed} hint={`处理中 ${vectorStats.processing} · 排队 ${vectorStats.pending}`} color="text-purple-600" bg="bg-purple-50" />
+        <StatCard icon={AlertTriangle} label="向量化失败" value={vectorStats.failed} hint={vectorStats.failed > 0 ? '需要排查' : '正常'} color="text-amber-600" bg="bg-amber-50" />
       </div>
 
-      {/* 类型统计网格（8 类） */}
+      {/* 类型分布 */}
       <div className="card-surface rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-4 w-4 text-foreground/60" />
           <span className="text-sm font-semibold">按类型分布</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-          {ALL_TYPES.map(type => {
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+          {DOCUMENT_TYPES.map(type => {
             const count = typeStats[type] ?? 0
             const style = TYPE_COLOR[type]
             const active = typeFilter === type
@@ -189,8 +213,7 @@ export default function AdminKbPage() {
                 : 'bg-background border text-muted-foreground hover:text-foreground'
             )}
           >
-            全部
-            <span className="ml-1 opacity-70">({docs.length})</span>
+            全部 <span className="ml-1 opacity-70">({docs.length})</span>
           </button>
           {typeFilter !== '全部' && (
             <Badge className={cn(TYPE_COLOR[typeFilter].bg, TYPE_COLOR[typeFilter].text, TYPE_COLOR[typeFilter].border, 'border')}>
@@ -205,7 +228,7 @@ export default function AdminKbPage() {
         <div className="relative md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="搜索标题 / 来源 / 学校..."
+            placeholder="搜索文件名 / 标题..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9 h-10 rounded-full bg-background"
@@ -214,72 +237,66 @@ export default function AdminKbPage() {
       </div>
 
       {/* 文档列表 */}
-      {filtered.length > 0 ? (
+      {loading ? (
+        <div className="card-surface rounded-2xl py-20 text-center">
+          <Loader2 className="h-8 w-8 mx-auto mb-3 text-indigo-500 animate-spin" />
+          <p className="text-sm text-muted-foreground">正在加载知识库文档…</p>
+        </div>
+      ) : filtered.length > 0 ? (
         <div className="card-surface rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted/30 border-b">
                 <tr>
                   <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3">类型</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3">标题</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden md:table-cell">来源</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden lg:table-cell">关联院校</th>
-                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden md:table-cell">年份</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3">文件 / 标题</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden md:table-cell">向量化</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden lg:table-cell">切片数</th>
+                  <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3 hidden md:table-cell">上传时间</th>
                   <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-3">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(doc => {
-                  const style = TYPE_COLOR[doc.type]
+                  const style = TYPE_COLOR[doc.document_type]
+                  const vs = VECTOR_STATUS_STYLE[doc.vector_status]
+                  const VsIcon = vs.icon
                   return (
                     <tr key={doc.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 align-top">
                         <Badge className={cn(style.bg, style.text, style.border, 'border text-[10px] px-1.5 py-0')}>
-                          {doc.type}
+                          {doc.document_type}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 max-w-[300px]">
-                        <p className="text-sm font-medium leading-tight truncate">{doc.title}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{doc.relevance}</p>
+                      <td className="px-4 py-3 max-w-[320px]">
+                        <p className="text-sm font-medium leading-tight truncate">
+                          {doc.document_title || doc.file_name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                          <span className="font-mono">{doc.file_name}</span>
+                          <span className="ml-1 uppercase opacity-60">· {doc.file_type}</span>
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{doc.source}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {doc.schoolName ? (
-                          <Badge variant="outline" className="text-[10px]">
-                            <Building2 className="h-2.5 w-2.5 mr-0.5" />
-                            {doc.schoolName}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Badge className={cn('border text-[10px] inline-flex items-center gap-1', vs.cls)}>
+                          <VsIcon className={cn('h-2.5 w-2.5', doc.vector_status === 'processing' && 'animate-spin')} />
+                          {vs.label}
+                        </Badge>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell font-numeric">
-                        {doc.year ?? '—'}
+                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground font-numeric">
+                        {doc.chunk_count}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
+                        {new Date(doc.created_at).toLocaleString('zh-CN', { hour12: false })}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-1">
-                          <button
-                            onClick={() => setViewingDoc(doc)}
-                            className="p-1.5 rounded-md hover:bg-indigo-50 text-indigo-600 transition-colors"
-                            title="查看详情"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => toast.info('编辑功能开发中', '后续会接入富文本编辑器')}
-                            className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600 transition-colors"
-                            title="编辑"
-                          >
-                            <Upload className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(doc)}
-                            className="p-1.5 rounded-md hover:bg-red-50 text-red-600 transition-colors"
-                            title="删除"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleDelete(doc)}
+                          className="p-1.5 rounded-md hover:bg-red-50 text-red-600 transition-colors"
+                          title="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   )
@@ -289,27 +306,26 @@ export default function AdminKbPage() {
           </div>
         </div>
       ) : (
-        // 空状态
         <div className="card-surface rounded-2xl py-20 text-center">
           <div className="text-5xl mb-3">📭</div>
-          <p className="text-lg font-medium mb-1">没有匹配的文档</p>
-          <p className="text-sm text-muted-foreground mb-6">试试切换类型或清除搜索关键词</p>
-          <Button variant="outline" onClick={() => { setTypeFilter('全部'); setSearch('') }} className="rounded-full">
-            重置筛选
-          </Button>
+          <p className="text-lg font-medium mb-1">{docs.length === 0 ? '知识库还没有文档' : '没有匹配的文档'}</p>
+          <p className="text-sm text-muted-foreground mb-6">
+            {docs.length === 0 ? '点击「上传新文档」开始构建知识库' : '试试切换类型或清除搜索关键词'}
+          </p>
+          {docs.length > 0 && (
+            <Button variant="outline" onClick={() => { setTypeFilter('全部'); setSearch('') }} className="rounded-full">
+              重置筛选
+            </Button>
+          )}
         </div>
       )}
 
-      {/* 数据声明 */}
       <p className="text-center text-xs text-muted-foreground">
-        💡 当前展示 mock 数据，正式接入后将连接 PostgreSQL + pgvector 知识库
+        💡 文档上传后由后端自动切片+向量化，状态可在「向量化」列实时查看
       </p>
 
-      {/* 查看详情弹窗 */}
-      {viewingDoc && <DocViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />}
-
-      {/* 上传文档弹窗 */}
-      {showCreate && <DocCreator onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
+      {/* 上传弹窗 */}
+      {showCreate && <DocCreator onClose={() => setShowCreate(false)} onCreated={handleCreated} />}
     </div>
   )
 }
@@ -338,85 +354,67 @@ function StatCard({ icon: Icon, label, value, hint, color, bg }: {
   )
 }
 
-function DocViewer({ doc, onClose }: { doc: KnowledgeSource; onClose: () => void }) {
-  const style = TYPE_COLOR[doc.type]
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in-up" onClick={onClose}>
-      <div className="bg-background rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b flex items-start gap-3">
-          <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0', style.iconBg)}>
-            <FileText className={cn('h-5 w-5', style.text)} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge className={cn(style.bg, style.text, style.border, 'border text-[10px]')}>{doc.type}</Badge>
-              {doc.year && <Badge variant="outline" className="text-[10px]">{doc.year}</Badge>}
-              {doc.schoolName && <Badge variant="outline" className="text-[10px]">{doc.schoolName}</Badge>}
-            </div>
-            <h2 className="text-lg font-bold leading-tight">{doc.title}</h2>
-            <p className="text-xs text-muted-foreground mt-1">{doc.source}</p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+// ─── 上传表单弹窗 ────────────────────────────────────────
+function DocCreator({ onClose, onCreated }: {
+  onClose: () => void
+  onCreated: (doc: FileItem) => void
+}) {
+  const [schools, setSchools] = useState<School[]>([])
+  const [majors, setMajors] = useState<Major[]>([])
+  const [schoolsLoading, setSchoolsLoading] = useState(true)
+  const [majorsLoading, setMajorsLoading] = useState(false)
 
-        <div className="overflow-y-auto px-6 py-4 space-y-4">
-          <Section title="相关性说明">
-            <p className="text-sm text-foreground/80">{doc.relevance}</p>
-          </Section>
-          {doc.excerpt && (
-            <Section title="原文摘录">
-              <p className="text-sm text-foreground/70 italic border-l-2 border-primary/30 pl-3 leading-relaxed">
-                "{doc.excerpt}"
-              </p>
-            </Section>
-          )}
-          <Section title="向量化信息">
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <Field label="文档 ID" value={doc.id} mono />
-              <Field label="切片数" value="~75 个" />
-              <Field label="Embedding 模型" value="bge-large-zh-v1.5" mono />
-              <Field label="向量维度" value="1024" mono />
-            </div>
-          </Section>
-        </div>
+  const [schoolId, setSchoolId] = useState<string>('')
+  const [majorId, setMajorId] = useState<string>('__none__')
+  const [docType, setDocType] = useState<DocumentType>('保研政策')
+  const [docTitle, setDocTitle] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-        <div className="px-6 py-3 border-t bg-muted/20 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">本接口对应 API: <code className="px-1 bg-background rounded">GET /api/admin/kb/{doc.id}</code></span>
-          <Button size="sm" variant="outline" onClick={onClose} className="rounded-full">
-            关闭
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
+  // 加载学校列表
+  useEffect(() => {
+    let cancelled = false
+    setSchoolsLoading(true)
+    listSchools({ limit: 100 })
+      .then(r => { if (!cancelled) setSchools(r.items) })
+      .catch(err => { if (!cancelled) toast.error('学校列表加载失败', (err as Error).message) })
+      .finally(() => { if (!cancelled) setSchoolsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
-function DocCreator({ onClose, onCreate }: { onClose: () => void; onCreate: (doc: Omit<KnowledgeSource, 'id'>) => void }) {
-  const [type, setType] = useState<KnowledgeSourceType>('录取数据')
-  const [title, setTitle] = useState('')
-  const [source, setSource] = useState('')
-  const [year, setYear] = useState<number>(new Date().getFullYear())
-  const [schoolName, setSchoolName] = useState('')
-  const [relevance, setRelevance] = useState('')
-  const [excerpt, setExcerpt] = useState('')
+  // 选了学校后加载对应专业
+  useEffect(() => {
+    if (!schoolId) { setMajors([]); setMajorId('__none__'); return }
+    let cancelled = false
+    setMajorsLoading(true)
+    listMajors({ school_id: schoolId, limit: 100 })
+      .then(r => { if (!cancelled) setMajors(r.items) })
+      .catch(err => { if (!cancelled) toast.error('专业列表加载失败', (err as Error).message) })
+      .finally(() => { if (!cancelled) setMajorsLoading(false) })
+    setMajorId('__none__')
+    return () => { cancelled = true }
+  }, [schoolId])
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim() || !source.trim() || !relevance.trim()) {
-      toast.error('请填写完整必填字段')
-      return
+    if (!schoolId) { toast.error('请选择学校'); return }
+    if (!file) { toast.error('请选择文件'); return }
+    if (file.size > 50 * 1024 * 1024) { toast.error('文件超过 50MB 限制'); return }
+
+    setSubmitting(true)
+    try {
+      const created = await uploadFile({
+        file,
+        school_id: schoolId,
+        major_id: majorId === '__none__' ? undefined : majorId,
+        document_type: docType,
+        document_title: docTitle.trim() || undefined,
+      })
+      onCreated(created)
+    } catch (err) {
+      toast.error('上传失败', (err as Error).message)
+      setSubmitting(false)
     }
-    onCreate({
-      type,
-      title: title.trim(),
-      source: source.trim(),
-      year,
-      schoolName: schoolName.trim() || undefined,
-      relevance: relevance.trim(),
-      excerpt: excerpt.trim() || undefined,
-    })
   }
 
   return (
@@ -425,25 +423,69 @@ function DocCreator({ onClose, onCreate }: { onClose: () => void; onCreate: (doc
         <div className="px-6 py-4 border-b flex items-center gap-2">
           <Upload className="h-4 w-4 text-purple-600" />
           <h2 className="font-bold">上传新文档</h2>
-          <Badge className="bg-purple-100 text-purple-700 text-[10px] ml-auto mr-3">Mock</Badge>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onClose} className="ml-auto text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto px-6 py-4 space-y-4">
-          <Field2 label="文档类型 *">
-            <div className="grid grid-cols-4 gap-1.5">
-              {ALL_TYPES.map(t => {
-                const active = t === type
+          {/* 学校 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">所属学校 *</Label>
+            {schoolsLoading ? (
+              <div className="h-10 flex items-center text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> 加载学校列表中…
+              </div>
+            ) : schools.length === 0 ? (
+              <p className="text-xs text-muted-foreground">暂无学校。请先用后端 Admin API 创建学校。</p>
+            ) : (
+              <Select value={schoolId || undefined} onValueChange={setSchoolId}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="选择学校" /></SelectTrigger>
+                <SelectContent>
+                  {schools.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 className="h-3 w-3 text-muted-foreground" />
+                        {s.name}
+                        <span className="text-[10px] text-muted-foreground">· {s.province}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* 专业（可选） */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">所属专业（可选）</Label>
+            <Select value={majorId} onValueChange={setMajorId} disabled={!schoolId || majorsLoading}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder={schoolId ? (majorsLoading ? '加载专业中…' : '选择专业 / 不限') : '请先选择学校'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">不限（学校级文档）</SelectItem>
+                {majors.map(m => (
+                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 文档类型 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">文档类型 *</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {DOCUMENT_TYPES.map(t => {
+                const active = t === docType
                 const style = TYPE_COLOR[t]
                 return (
                   <button
                     key={t}
                     type="button"
-                    onClick={() => setType(t)}
+                    onClick={() => setDocType(t)}
                     className={cn(
-                      'px-2 py-1 rounded-md text-[11px] border transition-all',
+                      'px-2 py-1.5 rounded-md text-[11px] border transition-all',
                       active ? cn(style.bg, style.text, style.border) : 'border-border hover:border-foreground/20 text-muted-foreground'
                     )}
                   >
@@ -452,84 +494,47 @@ function DocCreator({ onClose, onCreate }: { onClose: () => void; onCreate: (doc
                 )
               })}
             </div>
-          </Field2>
-
-          <Field2 label="文档标题 *">
-            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：西安交通大学 2024 年湖南省招生计划" />
-          </Field2>
-
-          <Field2 label="数据来源 *">
-            <Input value={source} onChange={e => setSource(e.target.value)} placeholder="例如：西安交通大学本科招生网" />
-          </Field2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field2 label="年份">
-              <Input type="number" value={year} onChange={e => setYear(Number(e.target.value))} />
-            </Field2>
-            <Field2 label="关联院校">
-              <Input value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="可选" />
-            </Field2>
           </div>
 
-          <Field2 label="相关性说明 *">
-            <textarea
-              className="w-full text-sm border border-input rounded-md px-3 py-2 min-h-[60px] focus:outline-none focus:ring-2 focus:ring-ring"
-              value={relevance}
-              onChange={e => setRelevance(e.target.value)}
-              placeholder="说明本文档在 RAG 检索中的核心相关性"
-            />
-          </Field2>
+          {/* 标题 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">文档标题（可选）</Label>
+            <Input value={docTitle} onChange={e => setDocTitle(e.target.value)} placeholder="留空则使用文件名" className="h-10" />
+          </div>
 
-          <Field2 label="原文片段（用于切片）">
-            <textarea
-              className="w-full text-sm border border-input rounded-md px-3 py-2 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
-              value={excerpt}
-              onChange={e => setExcerpt(e.target.value)}
-              placeholder="可选。粘贴文档关键段落，系统会自动切片+向量化"
+          {/* 文件 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">文件 *（PDF / DOCX / DOC / TXT / MD，≤ 50MB）</Label>
+            <Input
+              type="file"
+              accept=".pdf,.docx,.doc,.txt,.md"
+              onChange={e => setFile(e.target.files?.[0] ?? null)}
+              className="h-10 cursor-pointer file:mr-2 file:rounded file:border-0 file:bg-muted file:text-xs file:px-2 file:py-1"
             />
-          </Field2>
+            {file && (
+              <p className="text-[11px] text-muted-foreground">
+                {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            )}
+          </div>
 
           <div className="text-[11px] text-muted-foreground bg-muted/30 rounded-md p-2 flex items-start gap-1.5">
             <ArrowUpRight className="h-3 w-3 flex-shrink-0 mt-0.5" />
-            <span>当前为前端 Mock，正式接入后调用 <code className="font-mono">POST /api/admin/kb/upload</code>（multipart），后端自动 OCR + 切片 + Embedding 入库</span>
+            <span>上传后后端自动 OCR + 切片 + 向量化入库，状态在「向量化」列实时刷新</span>
           </div>
         </form>
 
         <div className="px-6 py-3 border-t bg-muted/20 flex items-center justify-end gap-2">
-          <Button variant="outline" onClick={onClose} className="rounded-full">取消</Button>
-          <Button onClick={handleSubmit} className="rounded-full gap-1">
-            <Upload className="h-3.5 w-3.5" />
-            提交上传
+          <Button variant="outline" onClick={onClose} disabled={submitting} className="rounded-full">取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting || !schoolId || !file} className="rounded-full gap-1">
+            {submitting ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> 上传中…</>
+            ) : (
+              <><Upload className="h-3.5 w-3.5" /> 提交上传</>
+            )}
           </Button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-2">{title}</p>
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
-      <p className={cn('text-sm', mono && 'font-mono')}>{value}</p>
-    </div>
-  )
-}
-
-function Field2({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-foreground">{label}</label>
-      {children}
     </div>
   )
 }

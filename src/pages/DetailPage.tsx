@@ -4,13 +4,14 @@ import {
   ChevronRight, ChevronLeft, MapPin, ArrowUpRight,
   Sparkles, GraduationCap, Briefcase, Rocket,
   Target, Swords, GaugeCircle, FlaskConical, Trophy,
-  ChevronDown,
+  ChevronDown, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { mockSchoolDetails } from '@/data/mockData'
+import { useAppContext } from '@/hooks/useAppContext'
+import { getRecommendation, parseResult } from '@/services/recommendApi'
 import { cn } from '@/lib/utils'
 import { PostgradRadarChart } from '@/components/charts/PostgradRadarChart'
-import type { PostgradDimension, PostgradDimensionId } from '@/types'
+import type { PostgradDimension, PostgradDimensionId, SchoolDetail } from '@/types'
 
 // ─── Hooks ────────────────────────────────────────────────────
 
@@ -415,8 +416,29 @@ const SECTIONS = [
 export default function DetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const detail = mockSchoolDetails.find(s => s.id === id)
+  const { recommendationId } = useAppContext()
+  const [detail, setDetail] = useState<SchoolDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const activeId = useScrollSpy(SECTIONS.map(s => s.id))
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    ;(async () => {
+      if (!recommendationId) {
+        if (!cancelled) { setDetail(null); setLoading(false) }
+        return
+      }
+      try {
+        const record = await getRecommendation(recommendationId)
+        const found = parseResult(record.result).schoolDetails.find(s => s.id === id) ?? null
+        if (!cancelled) { setDetail(found); setLoading(false) }
+      } catch {
+        if (!cancelled) { setDetail(null); setLoading(false) }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [recommendationId, id])
 
   const handleJump = useCallback((id: string) => {
     const el = document.getElementById(id)
@@ -426,6 +448,15 @@ export default function DetailPage() {
       window.scrollTo({ top, behavior: 'smooth' })
     }
   }, [])
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-32 text-center">
+        <Loader2 className="h-10 w-10 mx-auto mb-5 text-indigo-500 animate-spin" />
+        <p className="text-muted-foreground">正在加载院校详情…</p>
+      </div>
+    )
+  }
 
   if (!detail) {
     return (

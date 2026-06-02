@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   GraduationCap, ArrowRight, Sparkles, Database, Brain, Target,
   ScrollText, BookOpenCheck, MapPin, Award, ChevronDown, Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
 import { useAppContext } from '@/hooks/useAppContext'
 import { mockStudentInfo } from '@/data/mockData'
+import { createRecommendation } from '@/services/recommendApi'
 import { cn } from '@/lib/utils'
 import type { StudentInfo, SubjectType, RiskPreference, SchoolPreference } from '@/types'
 
@@ -25,8 +27,15 @@ const PROVINCES = [
   '内蒙古', '新疆', '西藏', '青海', '宁夏', '甘肃', '海南',
 ]
 
-const CITIES = ['北京', '上海', '广州', '深圳', '成都', '武汉', '南京', '杭州', '长沙', '西安', '哈尔滨', '合肥']
 const SUBJECTS: SubjectType[] = ['物理', '化学', '生物', '历史', '地理', '政治']
+
+// 意向专业候选（规范全称，用于后端精确匹配）。"计算机科学与技术"为后端当前主力数据。
+const MAJORS = [
+  '计算机科学与技术', '软件工程', '人工智能', '数据科学与大数据技术',
+  '电子信息工程', '通信工程', '电子科学与技术', '微电子科学与工程',
+  '自动化', '电气工程及其自动化', '网络空间安全', '信息安全',
+]
+
 const RISK_OPTIONS: { value: RiskPreference; label: string; desc: string }[] = [
   { value: '冲刺', label: '冲刺', desc: '愿意冒险，目标高校层次尽量高' },
   { value: '稳妥', label: '稳妥', desc: '录取为主，兼顾学校质量' },
@@ -51,64 +60,87 @@ const CAPABILITIES = [
 
 export default function InputPage() {
   const navigate = useNavigate()
-  const { setStudentInfo } = useAppContext()
+  const { setStudentInfo, setRecommendationId } = useAppContext()
 
   const [form, setForm] = useState<Partial<StudentInfo>>({
     province: undefined,
     score: undefined,
-    rank: undefined,
+    rank: null,
     subjects: [],
-    targetCities: [],
-    majorPreference: '',
+    targetProvinces: [],
+    targetMajors: [],
     schoolPreference: '211',
     careAboutPostgrad: true,
     riskPreference: '稳妥',
   })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 多选下拉的开/合状态（节省空间，避免一上来一大片 chips）
+  const [majorsOpen, setMajorsOpen] = useState(false)
+  const [targetProvincesOpen, setTargetProvincesOpen] = useState(false)
 
   function toggleSubject(s: SubjectType) {
     const curr = form.subjects ?? []
     setForm(f => ({ ...f, subjects: curr.includes(s) ? curr.filter(x => x !== s) : [...curr, s] }))
   }
 
-  function toggleCity(c: string) {
-    const curr = form.targetCities ?? []
-    setForm(f => ({ ...f, targetCities: curr.includes(c) ? curr.filter(x => x !== c) : [...curr, c] }))
+  function toggleTargetProvince(p: string) {
+    const curr = form.targetProvinces ?? []
+    setForm(f => ({ ...f, targetProvinces: curr.includes(p) ? curr.filter(x => x !== p) : [...curr, p] }))
+  }
+
+  function toggleMajor(m: string) {
+    const curr = form.targetMajors ?? []
+    setForm(f => ({ ...f, targetMajors: curr.includes(m) ? curr.filter(x => x !== m) : [...curr, m] }))
   }
 
   function useMockData() {
     setForm(mockStudentInfo)
     setError('')
-    toast.info('已填入示例数据', '湖南 568 分 · 物化生 · 重视保研')
+    toast.info('已填入示例数据', '黑龙江 568 分 · 物化生 · 计算机 · 重视保研')
   }
 
   function scrollToForm() {
     document.getElementById('student-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.province) { setError('请选择所在省份'); toast.error('请选择所在省份'); return }
     if (!form.score || form.score < 0 || form.score > 750) { setError('请输入有效的高考分数（0-750）'); toast.error('请输入有效的高考分数'); return }
-    if (!form.rank || form.rank < 1) { setError('请输入有效的高考位次'); toast.error('请输入有效的高考位次'); return }
+    // 位次不强制（若填了则校验范围）
+    if (form.rank != null && form.rank < 1) { setError('位次需大于 0，留空表示不填'); toast.error('位次需大于 0'); return }
     if (!form.subjects?.length) { setError('请至少选择一个选科'); toast.error('请至少选择一个选科'); return }
 
     setError('')
     setSubmitting(true)
+
+    const targetMajors = form.targetMajors ?? []
     const info: StudentInfo = {
       province: form.province!,
       score: form.score!,
-      rank: form.rank!,
+      rank: form.rank ?? null,
       subjects: form.subjects ?? [],
-      targetCities: form.targetCities ?? [],
-      majorPreference: form.majorPreference ?? '',
+      targetProvinces: form.targetProvinces ?? [],
+      targetMajors,
+      majorPreference: targetMajors.join(' / '),
       schoolPreference: (form.schoolPreference ?? '211') as SchoolPreference,
       careAboutPostgrad: form.careAboutPostgrad ?? false,
       riskPreference: (form.riskPreference ?? '稳妥') as RiskPreference,
+      educationGoal: form.careAboutPostgrad ? '保研' : undefined,
     }
     setStudentInfo(info)
-    toast.success('画像已生成', '正在为你匹配院校...')
-    setTimeout(() => navigate('/results'), 600)
+
+    try {
+      const recId = await createRecommendation(info)
+      setRecommendationId(recId)
+      toast.success('画像已提交', '正在为你匹配院校...')
+      navigate('/results')
+    } catch (err) {
+      setSubmitting(false)
+      const msg = (err as Error).message || '创建推荐任务失败，请稍后重试'
+      setError(msg)
+      toast.error('提交失败', msg)
+    }
   }
 
   return (
@@ -241,9 +273,9 @@ export default function InputPage() {
               <FormField label="基本信息" required>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="province" className="text-xs text-muted-foreground">所在省份</Label>
+                    <Label htmlFor="province" className="text-xs text-muted-foreground">生源地</Label>
                     <Select value={form.province || undefined} onValueChange={v => setForm(f => ({ ...f, province: v }))}>
-                      <SelectTrigger id="province" className="h-11"><SelectValue placeholder="请选择" /></SelectTrigger>
+                      <SelectTrigger id="province" className="h-11"><SelectValue placeholder="省/市/自治区" /></SelectTrigger>
                       <SelectContent>
                         {PROVINCES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                       </SelectContent>
@@ -257,11 +289,17 @@ export default function InputPage() {
                       onChange={e => setForm(f => ({ ...f, score: Number(e.target.value) || undefined }))} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="rank" className="text-xs text-muted-foreground">高考位次</Label>
-                    <Input id="rank" type="number" min={1} placeholder="例如 15000"
+                    <Label htmlFor="rank" className="text-xs text-muted-foreground">
+                      高考位次
+                      <span className="ml-1 text-muted-foreground/60">（可不填）</span>
+                    </Label>
+                    <Input id="rank" type="number" min={1} placeholder="不知道可留空"
                       className="h-11 font-numeric"
                       value={form.rank ?? ''}
-                      onChange={e => setForm(f => ({ ...f, rank: Number(e.target.value) || undefined }))} />
+                      onChange={e => {
+                        const v = e.target.value
+                        setForm(f => ({ ...f, rank: v === '' ? null : (Number(v) || null) }))
+                      }} />
                   </div>
                 </div>
               </FormField>
@@ -294,54 +332,48 @@ export default function InputPage() {
 
               <Separator />
 
-              {/* 目标城市 */}
-              <FormField label="目标城市" hint="可多选，不选则不限">
-                <div className="flex flex-wrap gap-2">
-                  {CITIES.map(c => {
-                    const active = form.targetCities?.includes(c)
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => toggleCity(c)}
-                        className={cn(
-                          'px-3 py-1.5 rounded-full text-xs font-medium transition-all border inline-flex items-center gap-1',
-                          active
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-background text-muted-foreground border-border hover:border-indigo-300 hover:text-foreground'
-                        )}
-                      >
-                        <MapPin className="h-3 w-3" />
-                        {c}
-                      </button>
-                    )
-                  })}
-                </div>
+              {/* 意向专业（折叠多选下拉） */}
+              <FormField label="意向专业" hint="可多选，不选则不限；用于后端精确匹配">
+                <MultiSelectDropdown
+                  open={majorsOpen}
+                  onToggle={() => setMajorsOpen(o => !o)}
+                  selected={form.targetMajors ?? []}
+                  placeholder="点击选择意向专业（可多选）"
+                  emptyLabel="不限"
+                  options={MAJORS}
+                  onSelect={toggleMajor}
+                />
               </FormField>
 
               <Separator />
 
-              {/* 偏好双列 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <FormField label="专业偏好">
-                  <Input
-                    placeholder="例如：计算机/电子信息"
-                    className="h-11"
-                    value={form.majorPreference ?? ''}
-                    onChange={e => setForm(f => ({ ...f, majorPreference: e.target.value }))}
-                  />
-                </FormField>
-                <FormField label="院校层次偏好">
-                  <Select value={form.schoolPreference} onValueChange={v => setForm(f => ({ ...f, schoolPreference: v as SchoolPreference }))}>
-                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(['985', '211', '双一流', '普通本科', '不限'] as SchoolPreference[]).map(v => (
-                        <SelectItem key={v} value={v}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-              </div>
+              {/* 目标省/直辖市/自治区 —— 折叠多选下拉 */}
+              <FormField label="目标省份 / 直辖市 / 自治区" hint="可多选；不选则不限定意向区域">
+                <MultiSelectDropdown
+                  open={targetProvincesOpen}
+                  onToggle={() => setTargetProvincesOpen(o => !o)}
+                  selected={form.targetProvinces ?? []}
+                  placeholder="点击选择目标地区（可多选）"
+                  emptyLabel="不限"
+                  options={PROVINCES}
+                  onSelect={toggleTargetProvince}
+                  showIcon
+                />
+              </FormField>
+
+              <Separator />
+
+              {/* 院校层次偏好 */}
+              <FormField label="院校层次偏好">
+                <Select value={form.schoolPreference} onValueChange={v => setForm(f => ({ ...f, schoolPreference: v as SchoolPreference }))}>
+                  <SelectTrigger className="h-11 max-w-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(['985', '211', '双一流', '普通本科', '不限'] as SchoolPreference[]).map(v => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
 
               <Separator />
 
@@ -402,7 +434,7 @@ export default function InputPage() {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      正在生成画像...
+                      正在提交并匹配...
                     </>
                   ) : (
                     <>
@@ -419,7 +451,7 @@ export default function InputPage() {
           </Card>
 
           <p className="text-xs text-center text-muted-foreground mt-6">
-            🔒 所有信息仅在本地浏览器存储，不会上传任何服务器
+            🔒 提交后画像将发送至后端生成个性化推荐；登录态与画像信息保存在本地浏览器
           </p>
         </div>
       </section>
@@ -447,6 +479,79 @@ function FormField({
         {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       {children}
+    </div>
+  )
+}
+
+// ─── 多选下拉（点击展开/收起，节省纵向空间） ────────────
+function MultiSelectDropdown({
+  open, onToggle, selected, options, onSelect, placeholder, emptyLabel, showIcon,
+}: {
+  open: boolean
+  onToggle: () => void
+  selected: string[]
+  options: string[]
+  onSelect: (v: string) => void
+  placeholder: string
+  emptyLabel: string
+  showIcon?: boolean
+}) {
+  const summary =
+    selected.length === 0
+      ? placeholder
+      : selected.length <= 4
+        ? `已选 ${selected.length} 项：${selected.join('、')}`
+        : `已选 ${selected.length} 项：${selected.slice(0, 4).join('、')} 等`
+
+  return (
+    <div className="space-y-2">
+      {/* 触发器 */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={cn(
+          'w-full h-11 px-4 rounded-xl border bg-background text-sm flex items-center justify-between transition-all',
+          open
+            ? 'border-indigo-400 ring-2 ring-indigo-100'
+            : 'border-border hover:border-indigo-300'
+        )}
+      >
+        <span className={cn('truncate', selected.length === 0 ? 'text-muted-foreground' : 'text-foreground')}>
+          {summary}
+        </span>
+        <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ml-2', open && 'rotate-180')} />
+      </button>
+
+      {/* 选项区 */}
+      {open && (
+        <div className="rounded-xl border border-border bg-muted/20 p-3 animate-fade-in-up">
+          <div className="flex flex-wrap gap-1.5">
+            {options.map(opt => {
+              const active = selected.includes(opt)
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onSelect(opt)}
+                  className={cn(
+                    'px-2.5 py-1.5 rounded-full text-xs font-medium transition-all border inline-flex items-center gap-1',
+                    active
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200'
+                      : 'bg-background text-muted-foreground border-border hover:border-indigo-300 hover:text-foreground'
+                  )}
+                >
+                  {showIcon && (active ? <CheckCircle2 className="h-3 w-3" /> : <MapPin className="h-3 w-3" />)}
+                  {opt}
+                </button>
+              )
+            })}
+          </div>
+          {selected.length === 0 && (
+            <p className="text-[11px] text-muted-foreground mt-2.5">{emptyLabel}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
