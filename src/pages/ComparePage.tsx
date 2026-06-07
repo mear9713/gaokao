@@ -32,8 +32,8 @@ type MetricKey = typeof COMPARE_METRICS[number]['key']
 
 const CATEGORY_BADGE: Record<RecommendCategory, string> = {
   '冲刺': 'bg-red-50 text-red-700 border-red-200',
-  '稳妥': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  '保底': 'bg-blue-50 text-blue-700 border-blue-200',
+  '稳妥': 'bg-blue-50 text-blue-700 border-blue-200',
+  '保底': 'bg-green-50 text-green-700 border-green-200',
 }
 
 function getMetricValue(
@@ -54,7 +54,7 @@ function getMetricValue(
       return rec ? <span className="text-lg font-bold text-gradient-blue font-numeric">{rec.matchScore}</span> : '—'
     case 'lastYearScore': return rec && rec.lastYearScore > 0 ? <span className="font-numeric">{rec.lastYearScore} 分</span> : '—'
     case 'lastYearRank':  return rec && rec.lastYearRank > 0 ? <span className="font-numeric">{rec.lastYearRank.toLocaleString()}</span> : '—'
-    case 'admissionRisk':
+    case 'admissionRisk': {
       if (!rec) return '—'
       const riskColor = rec.admissionRisk === '高' ? 'text-red-600' : rec.admissionRisk === '中' ? 'text-amber-600' : 'text-emerald-600'
       const dotColor  = rec.admissionRisk === '高' ? 'bg-red-500'  : rec.admissionRisk === '中' ? 'bg-amber-500'  : 'bg-emerald-500'
@@ -64,6 +64,7 @@ function getMetricValue(
           {rec.admissionRisk}风险
         </span>
       )
+    }
     case 'postgradRate':      return detail ? <span className="font-numeric font-semibold">{detail.majorDetail.postgradRate}%</span> : '—'
     case 'majorPostgradRate': return detail ? <span className="font-numeric font-bold text-purple-600">{detail.majorDetail.majorPostgradRate}%</span> : '—'
     case 'honorsClassRate':   return detail?.majorDetail.honorsClassRate !== undefined

@@ -178,3 +178,106 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ─── Markdown 渲染样式 ─── */
+.prose {
+  color: inherit;
+}
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: inherit;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+.prose h1 { font-size: 1.5em; }
+.prose h2 { font-size: 1.3em; }
+.prose h3 { font-size: 1.1em; }
+.prose p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.prose ul, .prose ol {
+  padding-left: 1.5em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+.prose code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.9em;
+}
+.prose pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+.prose blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  color: #6b7280;
+}
+.prose strong {
+  font-weight: 600;
+}
+.prose em {
+  font-style: italic;
+}
+.prose a {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+.prose a:hover {
+  color: #4338ca;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  font-size: 0.875em;
+  display: block;
+  overflow-x: auto;
+}
+.prose thead {
+  border-bottom: 2px solid #e5e7eb;
+}
+.prose tbody {
+  border-bottom: 1px solid #e5e7eb;
+}
+.prose th, .prose td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em 0.75em;
+  text-align: left;
+  white-space: nowrap;
+}
+.prose th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+.prose td {
+  color: #4b5563;
+}
+.prose tbody tr:hover {
+  background: #f9fafb;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}

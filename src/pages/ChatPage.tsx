@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Send, Bot, User, FileText, GraduationCap,
   UserCircle2, ClipboardList, ShieldCheck, Target, Sparkles,
@@ -21,7 +23,7 @@ import {
   mockRecommendations,
   initialChatMessages,
 } from '@/data/mockData'
-import { chatWithAgent } from '@/services/agentApi'
+import { chatWithAgent, chatWithAI } from '@/services/agentApi'
 import type {
   ChatMessage, KnowledgeSource, AgentStep,
   SchoolRecommendation, AgentResponse, RecommendCategory,
@@ -53,8 +55,8 @@ const SOURCE_TYPE_COLOR: Record<KnowledgeSourceType, string> = {
 
 const CATEGORY_COLOR: Record<RecommendCategory, string> = {
   '冲刺': 'bg-red-100 text-red-700 border-red-200',
-  '稳妥': 'bg-green-100 text-green-700 border-green-200',
-  '保底': 'bg-blue-100 text-blue-700 border-blue-200',
+  '稳妥': 'bg-blue-100 text-blue-700 border-blue-200',
+  '保底': 'bg-green-100 text-green-700 border-green-200',
 }
 
 const RISK_COLOR: Record<AdmissionRisk, string> = {
@@ -88,11 +90,19 @@ function AgentStepsPanel({ steps }: { steps: AgentStep[] }) {
                 复用 {cachedCount}
               </Badge>
             )}
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-200 text-purple-700">
-              新执行 {newCount}
-            </Badge>
+            {steps.length > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-200 text-purple-700">
+                新执行 {newCount}
+              </Badge>
+            )}
           </div>
         </div>
+        {steps.length === 0 && (
+          <div className="flex items-center gap-2 text-xs text-purple-700">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-500" />
+            <span>AI 正在思考中...</span>
+          </div>
+        )}
         {steps.map(step => {
           const Icon = STEP_ICON_MAP[step.icon]
           const isRunning = step.status === 'running'
@@ -149,8 +159,8 @@ function StreamingBubble({ content, isDone }: { content: string; isDone: boolean
         </AvatarFallback>
       </Avatar>
       <div className="max-w-[80%] flex flex-col gap-1">
-        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-muted text-foreground whitespace-pre-line">
-          {content}
+        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-muted text-foreground prose prose-sm prose-slate max-w-none">
+          <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
           {!isDone && (
             <span className="inline-block w-[2px] h-[1em] bg-primary ml-0.5 align-text-bottom animate-pulse" />
           )}
@@ -236,8 +246,8 @@ function AssistantMessage({
       </Avatar>
       <div className="max-w-[90%] flex flex-col gap-2.5 flex-1">
         {/* 文字气泡 */}
-        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-muted text-foreground whitespace-pre-line">
-          {msg.content}
+        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-muted text-foreground prose prose-sm prose-slate max-w-none">
+          <Markdown remarkPlugins={[remarkGfm]}>{msg.content}</Markdown>
         </div>
 
         {/* 折叠开关 —— 所有带推荐/建议的消息都显示 */}
@@ -757,6 +767,7 @@ export default function ChatPage() {
   const [lastSources, setLastSources] = useState<KnowledgeSource[]>([])
   const [lastRecommendations, setLastRecommendations] = useState<SchoolRecommendation[]>([])
   const [activeSourceIds, setActiveSourceIds] = useState<Set<string>>(new Set())
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const phaseRef  = useRef<ChatPhase>('idle')
@@ -794,6 +805,7 @@ export default function ChatPage() {
     setLastSources([])
     setLastRecommendations([])
     setActiveSourceIds(new Set())
+    setConversationId(undefined)
     localStorage.removeItem(MESSAGES_STORAGE_KEY)
   }, [])
 
@@ -816,82 +828,109 @@ export default function ChatPage() {
     setActiveSteps([])
 
     // 3. 收集流式响应
-    let collectedResponse: AgentResponse | null = null
-
-    streamCtrlRef.current = chatWithAgent(
-      { message: text, studentInfo: info, history: messages, mode, recommendationId },
-      {
-        onStep: (step, index) => {
-          setActiveSteps(prev => {
-            const next = [...prev]
-            // 推进或更新对应步骤
-            while (next.length <= index) {
-              next.push({ ...step, status: 'pending' })
-            }
-            next[index] = step
-            // 把之前的步骤标记为 done
-            for (let i = 0; i < index; i++) {
-              next[i] = { ...next[i], status: 'done' }
-            }
-            return next
-          })
-        },
-        onAllStepsDone: (response) => {
-          collectedResponse = response
-          setPhase('streaming')
-          phaseRef.current = 'streaming'
-          setStreamingContent('')
-          setIsStreamingDone(false)
-          setActiveSteps([])
-          setLastSources(response.sources)
-          setLastRecommendations(response.recommendations)
-          setActiveSourceIds(new Set(response.sources.map(s => s.id)))
-        },
-        onToken: (_chunk, fullSoFar) => {
-          setStreamingContent(fullSoFar)
-        },
-        onDone: (response) => {
-          setIsStreamingDone(true)
-          // 把流式内容固化为正式消息（带 agentData）
-          setTimeout(() => {
-            const aiMsg: ChatMessage = {
-              id: `msg_${Date.now()}`,
-              role: 'assistant',
-              content: response.answer,
-              timestamp: Date.now(),
-              agentData: {
-                recommendations: response.recommendations,
-                sources: response.sources,
-                nextActions: response.nextActions,
-              },
-            }
-            setMessages(prev => [...prev, aiMsg])
-            setPhase('idle')
-            phaseRef.current = 'idle'
-            setStreamingContent('')
-          }, 300)
-        },
-        onError: (err) => {
-          console.error('[Agent] Error:', err)
-          const errMsg: ChatMessage = {
+    const stepCallbacks = {
+      onStep: (step: AgentStep, index: number) => {
+        setActiveSteps(prev => {
+          const next = [...prev]
+          while (next.length <= index) {
+            next.push({ ...step, status: 'pending' })
+          }
+          next[index] = step
+          for (let i = 0; i < index; i++) {
+            next[i] = { ...next[i], status: 'done' }
+          }
+          return next
+        })
+      },
+      onAllStepsDone: (response: AgentResponse) => {
+        setPhase('streaming')
+        phaseRef.current = 'streaming'
+        setStreamingContent('')
+        setIsStreamingDone(false)
+        setActiveSteps([])
+        setLastSources(response.sources)
+        setLastRecommendations(response.recommendations)
+        setActiveSourceIds(new Set(response.sources.map(s => s.id)))
+      },
+      onToken: (_chunk: string, fullSoFar: string) => {
+        setStreamingContent(fullSoFar)
+      },
+      onDone: (response: AgentResponse) => {
+        setIsStreamingDone(true)
+        setTimeout(() => {
+          const aiMsg: ChatMessage = {
             id: `msg_${Date.now()}`,
             role: 'assistant',
-            content: `⚠️ ${err.message || '咨询失败，请稍后重试'}`,
+            content: response.answer,
             timestamp: Date.now(),
+            agentData: {
+              recommendations: response.recommendations,
+              sources: response.sources,
+              nextActions: response.nextActions,
+            },
           }
-          setMessages(prev => [...prev, errMsg])
+          setMessages(prev => [...prev, aiMsg])
           setPhase('idle')
           phaseRef.current = 'idle'
-          setActiveSteps([])
-        },
+          setStreamingContent('')
+        }, 300)
       },
-    )
-
-    // 立即更新一次知识源面板（不等流式完成）
-    if (collectedResponse) {
-      // 占位（实际由 onAllStepsDone 触发）
+      onError: (err: Error) => {
+        console.error('[Agent] Error:', err)
+        const errMsg: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          role: 'assistant',
+          content: `⚠️ ${err.message || '咨询失败，请稍后重试'}`,
+          timestamp: Date.now(),
+        }
+        setMessages(prev => [...prev, errMsg])
+        setPhase('idle')
+        phaseRef.current = 'idle'
+        setActiveSteps([])
+      },
     }
-  }, [info, messages, mode])
+
+    // 深度模式：全局 AI 问答 + 联网搜索
+    if (mode === 'deep') {
+      const deepSteps: AgentStep[] = [
+        { id: 's1', icon: 'profile', label: '分析用户问题', status: 'running', cached: false, detail: '识别问题意图、目标院校和需要补充的数据维度' },
+        { id: 's2', icon: 'plan', label: '检索知识库', status: 'pending', cached: false, detail: '匹配本地招生、保研、培养方案等知识片段' },
+        { id: 's3', icon: 'policy', label: '联网搜索增强', status: 'pending', cached: false, detail: '补充最新公开信息，并和本地知识库交叉校验' },
+        { id: 's4', icon: 'match', label: '整合分析结果', status: 'pending', cached: false, detail: '合并来源、筛掉弱相关信息，整理结论顺序' },
+        { id: 's5', icon: 'generate', label: '生成回答', status: 'pending', cached: false, detail: '正在组织可引用的完整回答，稍等一下' },
+      ]
+      const stepDurations = [1400, 2600, 3600, 2400]
+
+      setActiveSteps(deepSteps)
+      const advanceSteps = async () => {
+        for (let i = 0; i < deepSteps.length - 1; i++) {
+          await new Promise(resolve => setTimeout(resolve, stepDurations[i]))
+          if (phaseRef.current !== 'agent-running') return
+          setActiveSteps(() => {
+            return deepSteps.map((step, idx) => ({
+              ...step,
+              status:
+                idx <= i ? 'done' :
+                idx === i + 1 ? 'running' :
+                'pending',
+            }))
+          })
+        }
+      }
+      void advanceSteps()
+
+      streamCtrlRef.current = chatWithAI(
+        { message: text, conversationId, useWebSearch: true },
+        { ...stepCallbacks, onConversationId: (id: string) => setConversationId(id) },
+      )
+    } else {
+      // 快速模式：基于推荐结果的 RAG 问答
+      streamCtrlRef.current = chatWithAgent(
+        { message: text, studentInfo: info, history: messages, mode, recommendationId },
+        stepCallbacks,
+      )
+    }
+  }, [info, messages, mode, recommendationId, conversationId])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1004,8 +1043,8 @@ export default function ChatPage() {
               <ProfileRow label="风险偏好" value={
                 <Badge className={`${
                   info.riskPreference === '冲刺' ? 'bg-red-100 text-red-700' :
-                  info.riskPreference === '稳妥' ? 'bg-green-100 text-green-700' :
-                  'bg-blue-100 text-blue-700'
+                  info.riskPreference === '稳妥' ? 'bg-blue-100 text-blue-700' :
+                  'bg-green-100 text-green-700'
                 } text-[10px] px-1.5 py-0`}>{info.riskPreference}</Badge>
               } />
               <Separator />
@@ -1119,7 +1158,7 @@ export default function ChatPage() {
           <div className="px-3 pt-2 pb-1 border-t flex items-center justify-between">
             <ModeSwitch mode={mode} onChange={setMode} disabled={isLoading} />
             <span className="text-[10px] text-muted-foreground">
-              {mode === 'deep' ? '⚡ 7 步推理 + 5 来源 + 扩展分析' : '⚡ 5 步推理 + 3 来源'}
+              {mode === 'deep' ? '知识库 + 联网搜索增强' : '基于推荐结果的知识库问答'}
             </span>
           </div>
 

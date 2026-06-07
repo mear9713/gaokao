@@ -20,8 +20,8 @@ import type { RecommendCategory, AdmissionRisk, SchoolRecommendation } from '@/t
 // ─── 视觉常量 ──────────────────────────────────────────────
 const CATEGORY_STYLES: Record<RecommendCategory, { badge: string; ring: string; text: string }> = {
   '冲刺': { badge: 'bg-red-50 text-red-700 border-red-200',             ring: 'ring-red-100',     text: 'text-red-600' },
-  '稳妥': { badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', ring: 'ring-emerald-100', text: 'text-emerald-600' },
-  '保底': { badge: 'bg-blue-50 text-blue-700 border-blue-200',          ring: 'ring-blue-100',    text: 'text-blue-600' },
+  '稳妥': { badge: 'bg-blue-50 text-blue-700 border-blue-200',          ring: 'ring-blue-100',    text: 'text-blue-600' },
+  '保底': { badge: 'bg-green-50 text-green-700 border-green-200',       ring: 'ring-green-100',   text: 'text-green-600' },
 }
 
 const RISK_STYLES: Record<AdmissionRisk, { bg: string; dot: string; text: string }> = {
@@ -303,8 +303,8 @@ export default function ResultsPage() {
           <div className="grid grid-cols-4 gap-3 mt-auto">
             <StatCard label="总推荐" value={stats.total} color="text-foreground" />
             <StatCard label="冲刺"   value={stats.chase} color="text-red-600" />
-            <StatCard label="稳妥"   value={stats.stable} color="text-emerald-600" />
-            <StatCard label="保底"   value={stats.safe} color="text-blue-600" />
+            <StatCard label="稳妥"   value={stats.stable} color="text-blue-600" />
+            <StatCard label="保底"   value={stats.safe} color="text-green-600" />
           </div>
         </div>
       </div>
@@ -315,15 +315,20 @@ export default function ResultsPage() {
           {(['全部', '冲刺', '稳妥', '保底'] as const).map(cat => {
             const active = filter === cat
             const count = cat === '全部' ? stats.total : cat === '冲刺' ? stats.chase : cat === '稳妥' ? stats.stable : stats.safe
+            const catStyle = cat === '全部' ? null : CATEGORY_STYLES[cat]
             return (
               <button
                 key={cat}
                 onClick={() => setFilter(cat)}
                 className={cn(
-                  'px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap',
+                  'px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap border',
                   active
-                    ? 'bg-foreground text-background shadow-sm'
-                    : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                    ? catStyle
+                      ? `${catStyle.badge} shadow-sm`
+                      : 'bg-foreground text-background border-foreground shadow-sm'
+                    : catStyle
+                      ? 'bg-background text-muted-foreground hover:text-foreground hover:border-current'
+                      : 'bg-background text-muted-foreground hover:text-foreground border-border'
                 )}
               >
                 {cat} <span className="ml-1 text-xs opacity-70">({count})</span>

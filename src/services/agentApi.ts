@@ -18,6 +18,17 @@ import type {
   KnowledgeSource,
   SchoolRecommendation,
 } from '@/types'
+
+export interface AIChatRequest {
+  message: string
+  conversationId?: string
+  useWebSearch?: boolean
+}
+
+export interface AIChatCallbacks extends AgentStreamCallbacks {
+  onConversationId?: (id: string) => void
+}
+
 import { API_BASE_URL, AUTH_STORAGE_KEY, getStoredToken } from './http'
 
 export interface AgentStreamCallbacks {
@@ -268,6 +279,154 @@ export function chatWithAgent(
       }
 
       // 流自然结束但未收到 done 帧：用已累积内容兜底收尾
+      if (!cancelled) finish()
+    } catch (err) {
+      if (!cancelled) callbacks.onError?.(err as Error)
+    }
+  })()
+
+  return {
+    cancel: () => {
+      cancelled = true
+      controller.abort()
+    },
+  }
+}
+
+/**
+ * 全局 AI 问答（深度模式）— SSE 流式。
+ *
+ * 端点：POST /api/v1/ai/chat
+ * 请求体：{ message, conversationId?, useWebSearch? }
+ * 响应：text/event-stream
+ * 事件类型：conversation_id / token / sources / done / error
+ */
+export function chatWithAI(
+  request: AIChatRequest,
+  callbacks: AIChatCallbacks = {},
+): StreamControl {
+  const controller = new AbortController()
+  let cancelled = false
+
+  void (async () => {
+    try {
+      const token = getStoredToken()
+      const res = await fetch(`${API_BASE_URL}/v1/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: request.message,
+          conversation_id: request.conversationId,
+          use_web_search: request.useWebSearch ?? true,
+        }),
+        signal: controller.signal,
+      })
+
+      if (res.status === 401) {
+        try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch { /* ignore */ }
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.replace('/login')
+        }
+        throw new Error('登录已过期，请重新登录')
+      }
+
+      if (!res.ok || !res.body) {
+        let msg = `AI 问答请求失败 (${res.status})`
+        try {
+          const j = await res.json()
+          msg = j.detail ?? j.message ?? msg
+        } catch { /* ignore */ }
+        throw new Error(msg)
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      let answer = ''
+      let sources: KnowledgeSource[] = []
+      let doneFired = false
+      let allStepsDoneFired = false
+
+      const fireAllStepsDone = () => {
+        if (allStepsDoneFired) return
+        allStepsDoneFired = true
+        callbacks.onAllStepsDone?.({
+          answer: '',
+          agentSteps: [],
+          recommendations: [],
+          sources,
+          nextActions: [],
+        })
+      }
+
+      const finish = () => {
+        if (doneFired) return
+        doneFired = true
+        fireAllStepsDone()
+        callbacks.onDone?.({
+          answer,
+          agentSteps: [],
+          recommendations: [],
+          sources,
+          nextActions: [],
+        })
+      }
+
+      const handleEvent = (evt: any) => {
+        const type = evt?.type
+        const payload = evt?.payload ?? {}
+        switch (type) {
+          case 'conversation_id':
+            callbacks.onConversationId?.(evt.conversation_id ?? payload.conversation_id ?? '')
+            break
+          case 'token': {
+            fireAllStepsDone()
+            const delta = evt.token ?? payload.delta ?? payload.content ?? payload.text ?? ''
+            answer += delta
+            callbacks.onToken?.(delta, answer)
+            break
+          }
+          case 'sources': {
+            const raw = evt.sources ?? payload.sources ?? payload
+            sources = normalizeSources(Array.isArray(raw) ? raw : [])
+            break
+          }
+          case 'done':
+            finish()
+            break
+          case 'error':
+            throw new Error(evt.message ?? payload?.message ?? payload?.detail ?? '服务端返回错误')
+        }
+      }
+
+      while (!cancelled) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          const dataLine = part.split('\n').find(l => l.startsWith('data:'))
+          if (!dataLine) continue
+          const jsonStr = dataLine.slice(5).trim()
+          if (!jsonStr) continue
+          let evt: any
+          try {
+            evt = JSON.parse(jsonStr)
+          } catch {
+            continue
+          }
+          handleEvent(evt)
+          if (doneFired) break
+        }
+        if (doneFired) break
+      }
+
       if (!cancelled) finish()
     } catch (err) {
       if (!cancelled) callbacks.onError?.(err as Error)

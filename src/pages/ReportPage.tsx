@@ -28,8 +28,8 @@ function SectionTitle({ icon, title, number }: { icon: React.ReactNode; title: s
 function CategoryBadge({ cat }: { cat: RecommendCategory }) {
   const map: Record<RecommendCategory, string> = {
     冲刺: 'bg-red-100 text-red-700 border border-red-200',
-    稳妥: 'bg-green-100 text-green-700 border border-green-200',
-    保底: 'bg-blue-100 text-blue-700 border border-blue-200',
+    稳妥: 'bg-blue-100 text-blue-700 border border-blue-200',
+    保底: 'bg-green-100 text-green-700 border border-green-200',
   }
   return <Badge className={`text-xs ${map[cat]}`}>{cat}</Badge>
 }
@@ -201,14 +201,14 @@ export default function ReportPage() {
         </Card>
 
         {/* 模块 4：稳妥方案 */}
-        <Card className="border-green-200">
+        <Card className="border-blue-200">
           <CardHeader>
-            <SectionTitle number={4} icon={<CheckCircle className="h-4 w-4 text-green-500" />} title="稳妥方案" />
+            <SectionTitle number={4} icon={<CheckCircle className="h-4 w-4 text-blue-500" />} title="稳妥方案" />
           </CardHeader>
           <CardContent>
-            <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-4">
-              <p className="text-sm text-green-700 font-medium">✅ 稳妥策略说明</p>
-              <p className="text-sm text-green-600 mt-1">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-700 font-medium">✅ 稳妥策略说明</p>
+              <p className="text-sm text-blue-600 mt-1">
                 以下院校往年录取分数线与你的成绩基本持平（±5分以内），录取概率较高，是志愿填报的核心主力选项。
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function ReportPage() {
                     <p className="text-xs text-muted-foreground mt-1">{r.recommendedMajor} · {r.city} · 往年分数线 {r.lastYearScore}</p>
                     <p className="text-xs text-foreground mt-1">{r.reason}</p>
                   </div>
-                  <span className="text-2xl font-bold text-green-600 flex-shrink-0">{r.matchScore}</span>
+                  <span className="text-2xl font-bold text-blue-600 flex-shrink-0">{r.matchScore}</span>
                 </div>
               ))}
             </div>
@@ -231,14 +231,14 @@ export default function ReportPage() {
         </Card>
 
         {/* 模块 5：保底方案 */}
-        <Card className="border-blue-200">
+        <Card className="border-green-200">
           <CardHeader>
-            <SectionTitle number={5} icon={<CheckCircle className="h-4 w-4 text-blue-500" />} title="保底方案" />
+            <SectionTitle number={5} icon={<CheckCircle className="h-4 w-4 text-green-500" />} title="保底方案" />
           </CardHeader>
           <CardContent>
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-700 font-medium">🛡️ 保底策略说明</p>
-              <p className="text-sm text-blue-600 mt-1">
+            <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-700 font-medium">🛡️ 保底策略说明</p>
+              <p className="text-sm text-green-600 mt-1">
                 以下院校往年录取分数线低于你 10 分以上，基本可确保录取，是防止滑档的兜底选项，建议在志愿序列末尾配置 2-3 所。
               </p>
             </div>
@@ -253,7 +253,7 @@ export default function ReportPage() {
                     <p className="text-xs text-muted-foreground mt-1">{r.recommendedMajor} · {r.city} · 往年分数线 {r.lastYearScore}</p>
                     <p className="text-xs text-foreground mt-1">{r.reason}</p>
                   </div>
-                  <span className="text-2xl font-bold text-blue-600 flex-shrink-0">{r.matchScore}</span>
+                  <span className="text-2xl font-bold text-green-600 flex-shrink-0">{r.matchScore}</span>
                 </div>
               ))}
             </div>

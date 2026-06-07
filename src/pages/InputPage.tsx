@@ -42,6 +42,21 @@ const RISK_OPTIONS: { value: RiskPreference; label: string; desc: string }[] = [
   { value: '保底', label: '保底', desc: '确保录取，不接受落榜风险' },
 ]
 
+const RISK_OPTION_STYLES: Record<RiskPreference, { active: string; idle: string }> = {
+  冲刺: {
+    active: 'border-red-500 bg-red-50/70 ring-2 ring-red-100 text-red-700',
+    idle: 'border-border hover:border-red-300 hover:bg-red-50/50 bg-background',
+  },
+  稳妥: {
+    active: 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-100 text-blue-700',
+    idle: 'border-border hover:border-blue-300 hover:bg-blue-50/50 bg-background',
+  },
+  保底: {
+    active: 'border-green-500 bg-green-50/70 ring-2 ring-green-100 text-green-700',
+    idle: 'border-border hover:border-green-300 hover:bg-green-50/50 bg-background',
+  },
+}
+
 // 产品流程 4 步
 const WORKFLOW_STEPS = [
   { icon: GraduationCap, title: '输入信息', desc: '分数、位次、选科、偏好' },
@@ -81,7 +96,15 @@ export default function InputPage() {
 
   function toggleSubject(s: SubjectType) {
     const curr = form.subjects ?? []
-    setForm(f => ({ ...f, subjects: curr.includes(s) ? curr.filter(x => x !== s) : [...curr, s] }))
+    if (curr.includes(s)) {
+      setForm(f => ({ ...f, subjects: curr.filter(x => x !== s) }))
+    } else {
+      if (curr.length >= 3) {
+        toast.warning('高考选科最多选择 3 个科目')
+        return
+      }
+      setForm(f => ({ ...f, subjects: [...curr, s] }))
+    }
   }
 
   function toggleTargetProvince(p: string) {
@@ -109,7 +132,7 @@ export default function InputPage() {
     if (!form.score || form.score < 0 || form.score > 750) { setError('请输入有效的高考分数（0-750）'); toast.error('请输入有效的高考分数'); return }
     // 位次不强制（若填了则校验范围）
     if (form.rank != null && form.rank < 1) { setError('位次需大于 0，留空表示不填'); toast.error('位次需大于 0'); return }
-    if (!form.subjects?.length) { setError('请至少选择一个选科'); toast.error('请至少选择一个选科'); return }
+    if (!form.subjects?.length || form.subjects.length !== 3) { setError('高考选科必须选择 3 个科目'); toast.error('高考选科必须选择 3 个科目'); return }
 
     setError('')
     setSubmitting(true)
@@ -397,6 +420,7 @@ export default function InputPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {RISK_OPTIONS.map(opt => {
                     const active = form.riskPreference === opt.value
+                    const style = RISK_OPTION_STYLES[opt.value]
                     return (
                       <button
                         key={opt.value}
@@ -404,9 +428,7 @@ export default function InputPage() {
                         onClick={() => setForm(f => ({ ...f, riskPreference: opt.value }))}
                         className={cn(
                           'rounded-xl border p-3 text-left transition-all',
-                          active
-                            ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-100'
-                            : 'border-border hover:border-indigo-300 bg-background'
+                          active ? style.active : style.idle
                         )}
                       >
                         <div className="font-semibold text-sm">{opt.label}</div>
