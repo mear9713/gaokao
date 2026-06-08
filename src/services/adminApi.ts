@@ -136,3 +136,90 @@ export async function uploadFile(opts: {
 export async function deleteFile(id: string): Promise<void> {
   await http.delete(`/v1/admin/files/${id}`)
 }
+
+// ─── AI API 配置 ─────────────────────────────────────────
+export type AIProviderType = 'llm' | 'embedding'
+export type AIHealthStatus = 'unknown' | 'healthy' | 'unhealthy'
+
+export interface AIAPIConfig {
+  id: string
+  provider_type: AIProviderType
+  name: string
+  base_url: string | null
+  model_name: string
+  embedding_dim: number | null
+  weight: number
+  is_default: boolean
+  is_enabled: boolean
+  has_api_key: boolean
+  last_health_status: AIHealthStatus | null
+  last_health_checked_at: string | null
+  last_error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AIAPIConfigListResp {
+  items: AIAPIConfig[]
+  total: number
+}
+
+export interface AIAPIConfigPayload {
+  provider_type?: AIProviderType
+  name?: string
+  base_url?: string | null
+  api_key?: string
+  model_name?: string
+  embedding_dim?: number | null
+  weight?: number
+  is_default?: boolean
+  is_enabled?: boolean
+}
+
+export interface AIAPIConfigTestResp {
+  ok: boolean
+  config_id?: string | null
+  provider_type: AIProviderType
+  message: string
+  embedding_dim?: number | null
+}
+
+export async function listAIAPIConfigs(params: {
+  provider_type?: AIProviderType
+  skip?: number
+  limit?: number
+} = {}): Promise<AIAPIConfigListResp> {
+  const { data } = await http.get('/v1/admin/ai-api-configs', { params })
+  return data
+}
+
+export async function createAIAPIConfig(payload: AIAPIConfigPayload): Promise<AIAPIConfig> {
+  const { data } = await http.post('/v1/admin/ai-api-configs', payload)
+  return data
+}
+
+export async function updateAIAPIConfig(id: string, payload: AIAPIConfigPayload): Promise<AIAPIConfig> {
+  const { data } = await http.put(`/v1/admin/ai-api-configs/${id}`, payload)
+  return data
+}
+
+export async function deleteAIAPIConfig(id: string): Promise<void> {
+  await http.delete(`/v1/admin/ai-api-configs/${id}`)
+}
+
+export async function setDefaultAIAPIConfig(id: string): Promise<AIAPIConfig> {
+  const { data } = await http.post(`/v1/admin/ai-api-configs/${id}/set-default`)
+  return data
+}
+
+export async function testAIAPIConfig(id: string): Promise<AIAPIConfigTestResp> {
+  const { data } = await http.post(`/v1/admin/ai-api-configs/${id}/test`)
+  return data
+}
+
+export async function testAllAIAPIConfigs(provider_type: AIProviderType): Promise<AIAPIConfigTestResp> {
+  const { data } = await http.post('/v1/admin/ai-api-configs/test-all', null, {
+    params: { provider_type },
+  })
+  return data
+}

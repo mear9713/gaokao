@@ -14,6 +14,7 @@ import ChatPage from '@/pages/ChatPage'
 import ReportPage from '@/pages/ReportPage'
 import LoginPage from '@/pages/LoginPage'
 import AdminKbPage from '@/pages/AdminKbPage'
+import AdminAIConfigPage from '@/pages/AdminAIConfigPage'
 
 function Layout() {
   const location = useLocation()
@@ -99,6 +100,14 @@ function App() {
                   element={
                     <RequireAuth role="admin">
                       <AdminKbPage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/ai-api"
+                  element={
+                    <RequireAuth role="admin">
+                      <AdminAIConfigPage />
                     </RequireAuth>
                   }
                 />
