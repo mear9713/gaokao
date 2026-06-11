@@ -18,7 +18,7 @@ import { useAppContext } from '@/hooks/useAppContext'
 import { mockStudentInfo } from '@/data/mockData'
 import { createRecommendation } from '@/services/recommendApi'
 import { cn } from '@/lib/utils'
-import type { StudentInfo, SubjectType, RiskPreference, SchoolPreference } from '@/types'
+import type { StudentInfo, SubjectType, SchoolPreference } from '@/types'
 
 const PROVINCES = [
   '北京', '上海', '天津', '重庆', '广东', '江苏', '浙江', '山东',
@@ -35,27 +35,6 @@ const MAJORS = [
   '电子信息工程', '通信工程', '电子科学与技术', '微电子科学与工程',
   '自动化', '电气工程及其自动化', '网络空间安全', '信息安全',
 ]
-
-const RISK_OPTIONS: { value: RiskPreference; label: string; desc: string }[] = [
-  { value: '冲刺', label: '冲刺', desc: '愿意冒险，目标高校层次尽量高' },
-  { value: '稳妥', label: '稳妥', desc: '录取为主，兼顾学校质量' },
-  { value: '保底', label: '保底', desc: '确保录取，不接受落榜风险' },
-]
-
-const RISK_OPTION_STYLES: Record<RiskPreference, { active: string; idle: string }> = {
-  冲刺: {
-    active: 'border-red-500 bg-red-50/70 ring-2 ring-red-100 text-red-700',
-    idle: 'border-border hover:border-red-300 hover:bg-red-50/50 bg-background',
-  },
-  稳妥: {
-    active: 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-100 text-blue-700',
-    idle: 'border-border hover:border-blue-300 hover:bg-blue-50/50 bg-background',
-  },
-  保底: {
-    active: 'border-green-500 bg-green-50/70 ring-2 ring-green-100 text-green-700',
-    idle: 'border-border hover:border-green-300 hover:bg-green-50/50 bg-background',
-  },
-}
 
 // 产品流程 4 步
 const WORKFLOW_STEPS = [
@@ -75,19 +54,19 @@ const CAPABILITIES = [
 
 export default function InputPage() {
   const navigate = useNavigate()
-  const { setStudentInfo, setRecommendationId } = useAppContext()
+  const { studentInfo, setStudentInfo, setRecommendationId } = useAppContext()
 
-  const [form, setForm] = useState<Partial<StudentInfo>>({
-    province: undefined,
-    score: undefined,
-    rank: null,
-    subjects: [],
-    targetProvinces: [],
-    targetMajors: [],
-    schoolPreference: '211',
-    careAboutPostgrad: true,
-    riskPreference: '稳妥',
-  })
+  const [form, setForm] = useState<Partial<StudentInfo>>(() => ({
+    province: studentInfo?.province,
+    score: studentInfo?.score,
+    rank: studentInfo?.rank ?? null,
+    subjects: studentInfo?.subjects ?? [],
+    targetProvinces: studentInfo?.targetProvinces ?? [],
+    targetMajors: studentInfo?.targetMajors ?? [],
+    schoolPreference: studentInfo?.schoolPreference ?? '211',
+    careAboutPostgrad: studentInfo?.careAboutPostgrad ?? true,
+    riskPreference: studentInfo?.riskPreference ?? '稳妥',
+  }))
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // 多选下拉的开/合状态（节省空间，避免一上来一大片 chips）
@@ -148,7 +127,8 @@ export default function InputPage() {
       majorPreference: targetMajors.join(' / '),
       schoolPreference: (form.schoolPreference ?? '211') as SchoolPreference,
       careAboutPostgrad: form.careAboutPostgrad ?? false,
-      riskPreference: (form.riskPreference ?? '稳妥') as RiskPreference,
+      // 后端会生成冲/稳/保分组；这里保留默认值只为兼容前端 StudentInfo 类型。
+      riskPreference: '稳妥',
       educationGoal: form.careAboutPostgrad ? '保研' : undefined,
     }
     setStudentInfo(info)
@@ -412,32 +392,6 @@ export default function InputPage() {
                   onCheckedChange={v => setForm(f => ({ ...f, careAboutPostgrad: v }))}
                 />
               </div>
-
-              <Separator />
-
-              {/* 风险偏好 */}
-              <FormField label="风险偏好">
-                <div className="grid grid-cols-3 gap-3">
-                  {RISK_OPTIONS.map(opt => {
-                    const active = form.riskPreference === opt.value
-                    const style = RISK_OPTION_STYLES[opt.value]
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, riskPreference: opt.value }))}
-                        className={cn(
-                          'rounded-xl border p-3 text-left transition-all',
-                          active ? style.active : style.idle
-                        )}
-                      >
-                        <div className="font-semibold text-sm">{opt.label}</div>
-                        <div className="text-xs text-muted-foreground mt-1 leading-tight">{opt.desc}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </FormField>
 
               {/* 错误提示 */}
               {error && (

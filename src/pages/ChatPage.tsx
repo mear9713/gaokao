@@ -19,7 +19,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAppContext } from '@/hooks/useAppContext'
 import {
   mockStudentInfo,
-  mockQuickQuestions,
   mockRecommendations,
   initialChatMessages,
 } from '@/data/mockData'
@@ -27,7 +26,7 @@ import { chatWithAgent, chatWithAI } from '@/services/agentApi'
 import type {
   ChatMessage, KnowledgeSource, AgentStep,
   SchoolRecommendation, AgentResponse, RecommendCategory,
-  AdmissionRisk, KnowledgeSourceType, AgentMode,
+  AdmissionRisk, KnowledgeSourceType, AgentMode, StudentInfo,
 } from '@/types'
 
 // ─── 类型 ──────────────────────────────────────────────────
@@ -63,6 +62,26 @@ const RISK_COLOR: Record<AdmissionRisk, string> = {
   '高': 'text-red-600',
   '中': 'text-amber-600',
   '低': 'text-green-600',
+}
+
+const ANSWER_DEPTH_INSTRUCTION = `
+
+【回答质量要求】
+请按资深高考志愿顾问的标准回答，别只给泛泛建议：
+1. 开头先给一句明确结论，说明最推荐/最不推荐什么。
+2. 用表格或分点比较关键学校/专业，尽量写出分数、位次、保研率、政策年份、来源片段里出现的证据。
+3. 区分“已有依据”和“需要核实”，资料不足就明确说待核实，不要编造。
+4. 给出可执行下一步，例如该查哪份招生章程、该问招生办什么、志愿排序如何调整。
+5. 不要复述本段要求，不要空泛鼓励。`
+
+function buildAnswerRequestMessage(message: string, info: StudentInfo) {
+  const cleanMessage = message.trim()
+  const profile = `\n\n【当前学生画像】${info.province} ${info.score}分${info.rank != null ? `，位次${info.rank}` : ''}，选科${info.subjects.join('/') || '未填'}，意向专业${info.majorPreference || info.targetMajors?.join('/') || '不限'}，目标地区${info.targetProvinces.length > 0 ? info.targetProvinces.join('/') : '不限'}，${info.careAboutPostgrad ? '重视保研' : '不特别强调保研'}。`
+  const enhanced = `${cleanMessage}${profile}${ANSWER_DEPTH_INSTRUCTION}`
+  if (enhanced.length <= 2000) return enhanced
+
+  const withoutProfile = `${cleanMessage}${ANSWER_DEPTH_INSTRUCTION}`
+  return withoutProfile.length <= 2000 ? withoutProfile : cleanMessage
 }
 
 // ─── 子组件 ────────────────────────────────────────────────
@@ -759,7 +778,7 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessagesFromStorage())
   const [input, setInput] = useState('')
-  const [mode, setMode] = useState<AgentMode>('quick')
+  const [mode, setMode] = useState<AgentMode>('deep')
   const [phase, setPhase] = useState<ChatPhase>('idle')
   const [activeSteps, setActiveSteps] = useState<AgentStep[]>([])
   const [streamingContent, setStreamingContent] = useState('')
@@ -826,6 +845,7 @@ export default function ChatPage() {
     setPhase('agent-running')
     phaseRef.current = 'agent-running'
     setActiveSteps([])
+    const requestMessage = buildAnswerRequestMessage(text, info)
 
     // 3. 收集流式响应
     const stepCallbacks = {
@@ -920,13 +940,13 @@ export default function ChatPage() {
       void advanceSteps()
 
       streamCtrlRef.current = chatWithAI(
-        { message: text, conversationId, useWebSearch: true },
+        { message: requestMessage, conversationId, useWebSearch: true },
         { ...stepCallbacks, onConversationId: (id: string) => setConversationId(id) },
       )
     } else {
       // 快速模式：基于推荐结果的 RAG 问答
       streamCtrlRef.current = chatWithAgent(
-        { message: text, studentInfo: info, history: messages, mode, recommendationId },
+        { message: requestMessage, studentInfo: info, history: messages, mode, recommendationId },
         stepCallbacks,
       )
     }
@@ -1040,14 +1060,6 @@ export default function ChatPage() {
                 </div>
               </div>
               <Separator />
-              <ProfileRow label="风险偏好" value={
-                <Badge className={`${
-                  info.riskPreference === '冲刺' ? 'bg-red-100 text-red-700' :
-                  info.riskPreference === '稳妥' ? 'bg-blue-100 text-blue-700' :
-                  'bg-green-100 text-green-700'
-                } text-[10px] px-1.5 py-0`}>{info.riskPreference}</Badge>
-              } />
-              <Separator />
               <ProfileRow label="升学目标" value={
                 <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">{educationGoal}</Badge>
               } />
@@ -1138,27 +1150,11 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* 快捷问题 */}
-          <div className="px-4 pb-2 pt-1 border-t bg-muted/20">
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {mockQuickQuestions.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => sendMessage(q)}
-                  disabled={isLoading}
-                  className="flex-shrink-0 text-xs bg-background border rounded-full px-3 py-1 hover:bg-muted transition-colors disabled:opacity-40 text-muted-foreground hover:text-foreground"
-                >
-                  {q.length > 20 ? q.slice(0, 20) + '…' : q}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* 模式切换 */}
           <div className="px-3 pt-2 pb-1 border-t flex items-center justify-between">
             <ModeSwitch mode={mode} onChange={setMode} disabled={isLoading} />
             <span className="text-[10px] text-muted-foreground">
-              {mode === 'deep' ? '知识库 + 联网搜索增强' : '基于推荐结果的知识库问答'}
+              {mode === 'deep' ? '默认深度回答：结论 + 依据 + 对比 + 下一步' : '快速回答：基于推荐结果问答'}
             </span>
           </div>
 

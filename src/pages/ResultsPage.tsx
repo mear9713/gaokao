@@ -155,7 +155,7 @@ export default function ResultsPage() {
 
   const strategySummary = useMemo(() => {
     const rankStr = info.rank != null ? `，位次 ${info.rank.toLocaleString()}` : ''
-    return `你的分数 ${info.score} 分${rankStr}（${info.province}生源）。基于你的【${info.riskPreference}】风险偏好和【${info.careAboutPostgrad ? '重视' : '不重视'}保研】的诉求，系统匹配出 ${stats.total} 所方案：${stats.chase} 所冲刺、${stats.stable} 所稳妥、${stats.safe} 所保底。`
+    return `你的分数 ${info.score} 分${rankStr}（${info.province}生源）。基于你的院校、专业、地区和【${info.careAboutPostgrad ? '重视' : '不重视'}保研】诉求，系统自动生成 ${stats.total} 所方案：${stats.chase} 所冲刺、${stats.stable} 所稳妥、${stats.safe} 所保底。`
   }, [info, stats])
 
   function handleAddCompare(id: string, name: string) {
@@ -277,11 +277,6 @@ export default function ResultsPage() {
               <div className="flex flex-wrap gap-1 justify-end">
                 {info.subjects.map(s => <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>)}
               </div>
-            } />
-            <Row label="风险偏好" value={
-              <Badge className={cn('text-[10px] border', CATEGORY_STYLES[info.riskPreference].badge)}>
-                {info.riskPreference}型
-              </Badge>
             } />
             <Row label="保研偏好" value={
               <span className={cn('text-xs font-medium', info.careAboutPostgrad ? 'text-purple-600' : 'text-muted-foreground')}>

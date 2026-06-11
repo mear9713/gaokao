@@ -926,7 +926,7 @@ function getNextActionsForScenario(scenario: Scenario): string[] {
       return ['查看电子科大保研政策详情', '对比 3 所高保研率院校', '生成保研规划报告']
     case 'admission':
     case 'risk':
-      return ['查看完整推荐表', '加入对比清单', '调整风险偏好重新匹配']
+      return ['查看完整推荐表', '加入对比清单', '调整目标条件重新匹配']
     case 'major':
       return ['查看专业培养方案', '对比 3 个相关专业', '咨询专业转专业政策']
     case 'city':
@@ -968,7 +968,7 @@ function getStepDetails(scenario: Scenario, info: StudentInfo): Record<string, s
     profile:  `识别画像：${info.province} ${info.score}分${info.rank != null ? ' 位次' + info.rank.toLocaleString() : ''} | 选科${subjectStr} | 目标省份${cityStr}`,
     plan:     `已检索：8 所 985/211 院校在${info.province}的招生计划，覆盖${subjectStr}组合`,
     policy:   `已加载：${info.careAboutPostgrad ? '8' : '3'} 份保研政策文件（重点：电子科大、西安交大、中南）`,
-    match:    `已运行匹配算法：基于位次差值 + 风险偏好(${info.riskPreference}) 筛出 4-5 所适配院校`,
+    match:    '已运行匹配算法：基于位次差值 + 志愿分档策略筛出 4-5 所适配院校',
     generate: `结合升学目标(${info.educationGoal ?? '保研'})生成个性化建议`,
   }
 
@@ -1126,7 +1126,7 @@ export function generateAgentResponse(
 - 当年招生计划数变化可能导致录取位次浮动 ±1500 名
 
 **3. 差异化策略建议**
-基于你的画像（${info.province}/${info.score}分/${info.riskPreference}型），如果只能选一个核心策略，建议：**${info.careAboutPostgrad ? '优先冲击保研率突出且有特色班的院校' : '优先匹配地域+专业实力综合最优的稳妥方案'}**。`
+基于你的画像（${info.province}/${info.score}分），如果只能选一个核心策略，建议：**${info.careAboutPostgrad ? '优先冲击保研率突出且有特色班的院校' : '优先匹配地域+专业实力综合最优的稳妥方案'}**。`
     : ''
 
   return {
