@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Menu, GraduationCap, X, LogIn, LogOut, ShieldCheck,
   User, Database, ChevronDown, ServerCog,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -96,6 +97,20 @@ export function Navbar() {
                 <ServerCog className="h-3.5 w-3.5" />
                 AI API 配置
               </NavLink>
+              <NavLink
+                to="/admin/logs"
+                className={({ isActive }) =>
+                  cn(
+                    'text-sm font-medium transition-colors flex items-center gap-1.5',
+                    isActive
+                      ? 'text-slate-800 font-semibold border-b-2 border-slate-500 pb-0.5'
+                      : 'text-slate-600 hover:text-slate-800'
+                  )
+                }
+              >
+                <FileText className="h-3.5 w-3.5" />
+                系统日志
+              </NavLink>
             </>
           )}
         </nav>
@@ -155,6 +170,13 @@ export function Navbar() {
                             >
                               <ServerCog className="h-3.5 w-3.5" />
                               AI API 配置
+                            </button>
+                            <button
+                              onClick={() => { setUserMenuOpen(false); navigate('/admin/logs') }}
+                              className="w-full px-4 py-2 text-sm flex items-center gap-2 hover:bg-muted/60 transition-colors text-slate-700"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              系统日志
                             </button>
                           </>
                         )}
@@ -283,6 +305,21 @@ export function Navbar() {
                     >
                       <ServerCog className="h-3.5 w-3.5" />
                       AI API 配置
+                    </NavLink>
+                    <NavLink
+                      to="/admin/logs"
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          'px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5',
+                          isActive
+                            ? 'bg-slate-100 text-slate-800'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        )
+                      }
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      系统日志
                     </NavLink>
                   </>
                 )}

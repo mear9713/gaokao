@@ -223,3 +223,30 @@ export async function testAllAIAPIConfigs(provider_type: AIProviderType): Promis
   })
   return data
 }
+
+// ─── 系统日志 ──────────────────────────────────────────────────
+export type SystemLogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+
+export interface SystemLogItem {
+  timestamp: string
+  level: SystemLogLevel | string
+  logger: string
+  process: string
+  message: string
+  raw: string
+}
+
+export interface SystemLogListResp {
+  items: SystemLogItem[]
+  total: number
+}
+
+export async function listSystemLogs(params: {
+  level?: SystemLogLevel
+  source?: string
+  q?: string
+  limit?: number
+} = {}): Promise<SystemLogListResp> {
+  const { data } = await http.get('/v1/admin/logs', { params })
+  return data
+}

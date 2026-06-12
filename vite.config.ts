@@ -7,7 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   // 开发环境后端地址，可在 .env.local 用 VITE_DEV_API_TARGET 覆盖
-  const apiTarget = env.VITE_DEV_API_TARGET || 'http://39.96.180.115:8001'
+  const apiTarget = env.VITE_DEV_API_TARGET || 'http://124.221.141.149:18001'
 
   return {
     plugins: [
